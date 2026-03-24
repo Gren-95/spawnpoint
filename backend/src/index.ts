@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { initDb } from './db/database';
 import { listServers } from './models/Server';
-import { syncContainerStates, setBroadcast } from './services/DockerManager';
+import { syncContainerStates, setBroadcast, checkDockerAvailable } from './services/DockerManager';
 import { broadcastToServer, createWsServer } from './ws/wsServer';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
@@ -31,6 +31,12 @@ async function main(): Promise<void> {
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
+
+  // Health check (public)
+  app.get('/api/health', async (_req, res) => {
+    const dockerAvailable = await checkDockerAvailable();
+    res.json({ success: true, data: { dockerAvailable } });
+  });
 
   // Auth routes are public (login/logout/check)
   app.use('/api/auth', authRouter);
@@ -60,6 +66,11 @@ async function main(): Promise<void> {
   createWsServer(server);
 
   setBroadcast(broadcastToServer);
+
+  const dockerAvailable = await checkDockerAvailable();
+  if (!dockerAvailable) {
+    console.error('[docker] Docker daemon is unavailable — check that /var/run/docker.sock is mounted. Server controls will not work.');
+  }
 
   const servers = listServers();
   await syncContainerStates(servers);

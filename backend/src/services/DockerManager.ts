@@ -372,6 +372,15 @@ export async function sendCommand(config: ServerConfig, command: string): Promis
   await exec.start({ Detach: true });
 }
 
+export async function checkDockerAvailable(): Promise<boolean> {
+  try {
+    await docker.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function pullImage(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     docker.pull(MC_IMAGE, (err: Error | null, stream: NodeJS.ReadableStream) => {

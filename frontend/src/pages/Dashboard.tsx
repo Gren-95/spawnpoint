@@ -1,16 +1,32 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, Cpu, MemoryStick, Users, Server } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Upload, MemoryStick, Users, Server, AlertTriangle } from 'lucide-react';
 import { useServersStore } from '../stores/serversStore';
 import StatusBadge from '../components/StatusBadge';
 
 export default function Dashboard() {
   const servers = useServersStore((s) => s.servers);
   const navigate = useNavigate();
+  const [dockerAvailable, setDockerAvailable] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(json => setDockerAvailable(json.data?.dockerAvailable ?? true))
+      .catch(() => {});
+  }, []);
 
   const running = servers.filter(s => s.runtime.status === 'running').length;
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      {!dockerAvailable && (
+        <div className="flex items-center gap-3 bg-red-900/20 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-400">
+          <AlertTriangle size={16} className="flex-shrink-0" />
+          Docker daemon is unreachable. Check that <code className="font-mono text-xs">/var/run/docker.sock</code> is mounted. Server controls will not work.
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
