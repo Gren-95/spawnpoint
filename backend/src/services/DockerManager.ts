@@ -365,26 +365,42 @@ export async function sendCommand(config: ServerConfig, command: string): Promis
     AttachStderr: true,
   });
 
-  const output = await new Promise<string>((resolve, reject) => {
-    exec.start({ hijack: true }, (err: Error | null, stream: NodeJS.ReadableStream) => {
-      if (err) return reject(err);
-      let buf = '';
-      stream.on('data', (chunk: Buffer) => {
-        // Docker multiplexed stream: 8-byte header per frame
-        let offset = 0;
-        while (offset + 8 <= chunk.length) {
-          const frameSize = chunk.readUInt32BE(offset + 4);
-          offset += 8;
-          if (frameSize > 0 && offset + frameSize <= chunk.length) {
-            buf += chunk.slice(offset, offset + frameSize).toString('utf8');
+  let raw: string;
+  try {
+    raw = await new Promise<string>((resolve, reject) => {
+      exec.start({ hijack: true }, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        // Dockerode incorrectly surfaces HTTP 101 (stream upgrade) as an error,
+        // but still provides a valid stream — ignore the 101 and use the stream.
+        if (err && !stream) return reject(err);
+        if (!stream) return resolve('');
+
+        let buf = '';
+        stream.on('data', (chunk: Buffer) => {
+          let offset = 0;
+          while (offset + 8 <= chunk.length) {
+            const frameSize = chunk.readUInt32BE(offset + 4);
+            offset += 8;
+            if (frameSize > 0 && offset + frameSize <= chunk.length) {
+              buf += chunk.slice(offset, offset + frameSize).toString('utf8');
+            }
+            offset += frameSize;
           }
-          offset += frameSize;
-        }
+        });
+        stream.on('end', () => resolve(buf.trim()));
+        stream.on('error', reject);
       });
-      stream.on('end', () => resolve(buf.trim()));
-      stream.on('error', reject);
     });
-  });
+  } catch (err) {
+    // Some Dockerode versions bundle the stream payload inside the error message
+    const msg = (err as Error).message ?? '';
+    const marker = 'unexpected - ';
+    const idx = msg.indexOf(marker);
+    raw = idx >= 0 ? msg.slice(idx + marker.length).trim() : '';
+    if (!raw) throw err;
+  }
+
+  // Strip ANSI escape codes that rcon-cli injects
+  const output = raw.replace(/\x1b\[[0-9;]*m/g, '').trim();
 
   if (output) {
     for (const line of output.split('\n')) {
