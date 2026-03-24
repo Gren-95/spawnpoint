@@ -18,6 +18,7 @@ import backupsRouter from './routes/backups';
 import consoleRouter from './routes/console';
 import prismRouter from './routes/prism';
 import playersRouter from './routes/players';
+import importBackupRouter from './routes/importBackup';
 
 async function main(): Promise<void> {
   if (!path.isAbsolute(HOST_DATA_DIR)) {
@@ -59,6 +60,7 @@ async function main(): Promise<void> {
   app.use('/api/servers/:id/console', consoleRouter);
   app.use('/api/servers/:id/players', playersRouter);
   app.use('/api/prism', prismRouter);
+  app.use('/api/backups', importBackupRouter);
 
   // Serve frontend (no auth — the SPA handles the login UI)
   if (fs.existsSync(PUBLIC_DIR)) {

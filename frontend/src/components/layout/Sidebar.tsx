@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Server, Plus, Upload, LayoutDashboard, X, LogOut, Search } from 'lucide-react';
+import { Server, Plus, Upload, LayoutDashboard, X, LogOut, Search, Archive } from 'lucide-react';
 import { useServersStore } from '../../stores/serversStore';
 import StatusBadge from '../StatusBadge';
 
@@ -105,6 +105,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         </button>
         <button onClick={() => nav('/servers/import')} className="btn-ghost w-full justify-start text-xs">
           <Upload size={14} /> Import Prism
+        </button>
+        <button onClick={() => nav('/servers/import-backup')} className="btn-ghost w-full justify-start text-xs">
+          <Archive size={14} /> Import Backup
         </button>
         <button onClick={logout} className="btn-ghost w-full justify-start text-xs text-mc-muted hover:text-red-400">
           <LogOut size={14} /> Sign out

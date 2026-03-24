@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import ServerDetail from './pages/ServerDetail';
 import CreateServer from './pages/CreateServer';
 import ImportPrism from './pages/ImportPrism';
+import ImportBackup from './pages/ImportBackup';
 import Login from './pages/Login';
 import { initWs } from './hooks/useServerSocket';
 import { useServersStore } from './stores/serversStore';
@@ -62,6 +63,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="servers/new" element={<CreateServer />} />
         <Route path="servers/import" element={<ImportPrism />} />
+        <Route path="servers/import-backup" element={<ImportBackup />} />
         <Route path="servers/:id/*" element={<ServerDetail />} />
       </Route>
     </Routes>
