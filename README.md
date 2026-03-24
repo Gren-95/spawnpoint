@@ -1,5 +1,7 @@
 # Spawnpoint
 
+[![Docker Hub](https://img.shields.io/docker/v/fossfrog/spawnpoint?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/fossfrog/spawnpoint)
+
 A self-hosted Minecraft server management dashboard. Run and manage multiple Minecraft servers from a single web UI, with real-time console, file management, backups, and player tracking — all containerized with Docker.
 
 ## Features
