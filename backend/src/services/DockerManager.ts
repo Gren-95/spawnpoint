@@ -358,18 +358,39 @@ export async function sendCommand(config: ServerConfig, command: string): Promis
   const rt = getRuntime(config.id);
   if (rt.status !== 'running') throw new Error('Server is not running');
 
-  // Use docker exec + rcon-cli inside the container rather than a direct TCP
-  // RCON connection. This avoids cross-network reachability issues between the
-  // dashboard container (on the compose network) and MC containers (on bridge).
-  // Detach: true fires the exec without attaching to the stream, avoiding the
-  // HTTP 101 "Switching Protocols" response that Dockerode misreports as an error.
   const container = docker.getContainer(containerName(config.id));
   const exec = await container.exec({
     Cmd: ['rcon-cli', '--password', config.rconPassword, command],
-    AttachStdout: false,
-    AttachStderr: false,
+    AttachStdout: true,
+    AttachStderr: true,
   });
-  await exec.start({ Detach: true });
+
+  const output = await new Promise<string>((resolve, reject) => {
+    exec.start({ hijack: true }, (err: Error | null, stream: NodeJS.ReadableStream) => {
+      if (err) return reject(err);
+      let buf = '';
+      stream.on('data', (chunk: Buffer) => {
+        // Docker multiplexed stream: 8-byte header per frame
+        let offset = 0;
+        while (offset + 8 <= chunk.length) {
+          const frameSize = chunk.readUInt32BE(offset + 4);
+          offset += 8;
+          if (frameSize > 0 && offset + frameSize <= chunk.length) {
+            buf += chunk.slice(offset, offset + frameSize).toString('utf8');
+          }
+          offset += frameSize;
+        }
+      });
+      stream.on('end', () => resolve(buf.trim()));
+      stream.on('error', reject);
+    });
+  });
+
+  if (output) {
+    for (const line of output.split('\n')) {
+      if (line.trim()) pushLine(config.id, line);
+    }
+  }
 }
 
 export async function checkDockerAvailable(): Promise<boolean> {
