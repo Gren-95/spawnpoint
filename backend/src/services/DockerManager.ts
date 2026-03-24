@@ -12,6 +12,7 @@ const docker = new Dockerode({ socketPath: '/var/run/docker.sock' });
 const runtimes = new Map<string, ServerRuntime>();
 const metricsIntervals = new Map<string, NodeJS.Timeout>();
 const logStreams = new Map<string, NodeJS.ReadableStream>();
+const inProgress = new Set<string>(); // servers with a lifecycle operation in flight
 
 type BroadcastFn = (serverId: string, msg: WsOutbound) => void;
 let broadcast: BroadcastFn = () => {};
@@ -206,11 +207,13 @@ export function getConsoleBuf(serverId: string): string[] {
 }
 
 export async function startServer(config: ServerConfig): Promise<void> {
+  if (inProgress.has(config.id)) throw new Error('Operation already in progress for this server');
   const rt = getRuntime(config.id);
   if (rt.status === 'running' || rt.status === 'starting') {
     throw new Error('Server is already running');
   }
 
+  inProgress.add(config.id);
   setStatus(config.id, 'starting');
   rt.metrics.playersOnline = 0;
   rt.playersOnline = [];
@@ -305,17 +308,22 @@ export async function startServer(config: ServerConfig): Promise<void> {
     ExposedPorts: { '25565/tcp': {} },
   });
 
-  await container.start();
-  getRuntime(config.id).containerId = container.id;
-
-  await attachLogs(config.id, container);
-  startMetrics(config.id, container);
+  try {
+    await container.start();
+    getRuntime(config.id).containerId = container.id;
+    await attachLogs(config.id, container);
+    startMetrics(config.id, container);
+  } finally {
+    inProgress.delete(config.id);
+  }
 }
 
 export async function stopServer(serverId: string): Promise<void> {
+  if (inProgress.has(serverId)) throw new Error('Operation already in progress for this server');
   const rt = getRuntime(serverId);
   if (rt.status === 'stopped') return;
 
+  inProgress.add(serverId);
   setStatus(serverId, 'stopping');
 
   try {
@@ -324,6 +332,8 @@ export async function stopServer(serverId: string): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!msg.includes('not running')) throw err;
+  } finally {
+    inProgress.delete(serverId);
   }
 
   stopMetrics(serverId);
