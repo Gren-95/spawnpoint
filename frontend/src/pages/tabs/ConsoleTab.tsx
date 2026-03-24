@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Copy, Check, Trash2, Star, X } from 'lucide-react';
-import { useConsole, sendWs } from '../../hooks/useServerSocket';
+import { useConsole } from '../../hooks/useServerSocket';
 import { useServersStore } from '../../stores/serversStore';
 import { api } from '../../api/client';
 
@@ -27,6 +27,7 @@ export default function ConsoleTab({ serverId }: { serverId: string }) {
     try { return JSON.parse(localStorage.getItem(`console_favourites_${serverId}`) ?? '[]'); } catch { return []; }
   });
   const [copied, setCopied] = useState(false);
+  const [cmdError, setCmdError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const status = useServersStore((s) => s.servers.find((sv) => sv.id === serverId)?.runtime.status);
@@ -67,17 +68,22 @@ export default function ConsoleTab({ serverId }: { serverId: string }) {
     });
   }
 
-  function sendCommand() {
+  async function sendCommand() {
     const cmd = input.trim();
     if (!cmd) return;
-    sendWs({ type: 'console_command', serverId, command: cmd });
+    setInput('');
+    setHistIdx(-1);
+    setCmdError('');
     setHistory((h) => {
       const next = [cmd, ...h.filter((c) => c !== cmd).slice(0, 99)];
       localStorage.setItem(`console_history_${serverId}`, JSON.stringify(next));
       return next;
     });
-    setHistIdx(-1);
-    setInput('');
+    try {
+      await api.post(`/servers/${serverId}/console/command`, { command: cmd });
+    } catch (err: unknown) {
+      setCmdError(err instanceof Error ? err.message : 'Command failed');
+    }
   }
 
   function toggleFavourite(cmd: string) {
@@ -120,6 +126,14 @@ export default function ConsoleTab({ serverId }: { serverId: string }) {
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {/* Command error */}
+      {cmdError && (
+        <div className="border-t border-mc-border px-3 py-1.5 text-xs text-red-400 bg-red-900/20 flex items-center justify-between">
+          {cmdError}
+          <button onClick={() => setCmdError('')} className="ml-2 text-red-400 hover:text-red-300"><X size={11} /></button>
+        </div>
+      )}
 
       {/* Favourites chips */}
       {favourites.length > 0 && (
