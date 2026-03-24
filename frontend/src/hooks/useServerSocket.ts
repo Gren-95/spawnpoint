@@ -6,6 +6,7 @@ type MsgHandler = (msg: Record<string, unknown>) => void;
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const handlers = new Set<MsgHandler>();
+const connectCallbacks = new Set<() => void>();
 
 function getWsUrl(): string {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -16,6 +17,8 @@ function connect(): void {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
   ws = new WebSocket(getWsUrl());
+
+  ws.onopen = () => connectCallbacks.forEach((cb) => cb());
 
   ws.onmessage = (e) => {
     try {
@@ -30,6 +33,11 @@ function connect(): void {
   };
 
   ws.onerror = () => ws?.close();
+}
+
+export function onWsConnect(cb: () => void): () => void {
+  connectCallbacks.add(cb);
+  return () => connectCallbacks.delete(cb);
 }
 
 export function sendWs(msg: unknown): void {

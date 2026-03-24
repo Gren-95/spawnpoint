@@ -7,7 +7,7 @@ import CreateServer from './pages/CreateServer';
 import ImportPrism from './pages/ImportPrism';
 import ImportBackup from './pages/ImportBackup';
 import Login from './pages/Login';
-import { initWs } from './hooks/useServerSocket';
+import { initWs, onWsConnect } from './hooks/useServerSocket';
 import { useServersStore } from './stores/serversStore';
 import { api } from './api/client';
 import type { Server } from './stores/serversStore';
@@ -35,8 +35,24 @@ export default function App() {
   useEffect(() => {
     if (auth !== 'authenticated') return;
     initWs();
-    api.get<Server[]>('/servers').then(setServers).catch(console.error);
+    const fetchServers = () => api.get<Server[]>('/servers').then(setServers).catch(() => {});
+    fetchServers();
+    // Re-sync on WS connect/reconnect to catch any missed status changes
+    const unsubWs = onWsConnect(fetchServers);
+    return unsubWs;
   }, [auth]);
+
+  // Fast-poll while any server is in a transitional state
+  useEffect(() => {
+    const transitional = servers.some((s) =>
+      s.runtime.status === 'starting' || s.runtime.status === 'stopping'
+    );
+    if (!transitional) return;
+    const interval = setInterval(() => {
+      api.get<Server[]>('/servers').then(setServers).catch(() => {});
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [servers]);
 
   useEffect(() => {
     const live = servers.filter((s) => s.runtime.status === 'running').length;
