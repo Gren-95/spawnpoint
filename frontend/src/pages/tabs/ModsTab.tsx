@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Package, Upload, Trash2 } from 'lucide-react';
+import { Package, Upload, Trash2, Search } from 'lucide-react';
 import { api, uploadFiles } from '../../api/client';
 
 interface Entry { name: string; path: string; size: number; mtime: string; }
@@ -11,6 +11,7 @@ function fmtSize(b: number) {
 export default function ModsTab({ serverId }: { serverId: string }) {
   const [mods, setMods] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -50,6 +51,19 @@ export default function ModsTab({ serverId }: { serverId: string }) {
         </div>
       </div>
 
+      {mods.length > 0 && (
+        <div className="flex items-center gap-1.5 bg-mc-dark border border-mc-border rounded px-2 py-1.5">
+          <Search size={13} className="text-mc-muted flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Filter mods…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent text-sm text-gray-300 placeholder-mc-muted outline-none flex-1"
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="text-mc-muted text-sm">Loading…</div>
       ) : mods.length === 0 ? (
@@ -60,6 +74,7 @@ export default function ModsTab({ serverId }: { serverId: string }) {
         </div>
       ) : (
         <div className="card overflow-hidden">
+          <div className="overflow-y-auto max-h-[60vh]">
           <table className="w-full text-sm">
             <thead className="text-xs text-mc-muted border-b border-mc-border bg-mc-panel/60">
               <tr>
@@ -69,7 +84,7 @@ export default function ModsTab({ serverId }: { serverId: string }) {
               </tr>
             </thead>
             <tbody>
-              {mods.map((mod) => (
+              {mods.filter(m => !search || m.name.toLowerCase().includes(search.toLowerCase())).map((mod) => (
                 <tr key={mod.path} className="border-b border-mc-border/40 hover:bg-mc-panel/40">
                   <td className="px-4 py-2 flex items-center gap-2 font-mono text-xs">
                     <Package size={13} className="text-mc-muted flex-shrink-0" />
@@ -85,6 +100,7 @@ export default function ModsTab({ serverId }: { serverId: string }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
