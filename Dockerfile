@@ -1,13 +1,13 @@
-# Stage 1: Build frontend
-FROM node:22-alpine AS frontend-build
+# Stage 1: Build frontend (run on build machine's native platform — output is static files)
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-build
 WORKDIR /build/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Install backend production deps with Bun (no native compilation needed)
-FROM oven/bun:1 AS backend-deps
+# Stage 2: Install backend production deps with Bun
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS backend-deps
 WORKDIR /app
 COPY backend/package.json backend/bun.lock* ./
 RUN bun install --production --trust-all-packages
