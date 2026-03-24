@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Archive, RotateCw, Trash2, Download, Plus, Globe, HardDrive, Package } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Archive, RotateCw, Trash2, Download, Plus, Globe, HardDrive, Package, Upload } from 'lucide-react';
 import { api } from '../../api/client';
 
 interface Backup {
@@ -38,6 +38,8 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
   const [backupType, setBackupType] = useState<'full' | 'world'>('world');
   const [error, setError] = useState('');
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   const label = baseLabel ? `${baseLabel}_${backupType}` : '';
 
@@ -95,6 +97,23 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
       setError(e instanceof Error ? e.message : 'Restore failed');
     }
     setRestoring(null);
+  }
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      await fetch(`/api/servers/${serverId}/backups/upload`, { method: 'POST', body: form });
+      load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    }
+    setUploading(false);
+    e.target.value = '';
   }
 
   async function remove(id: string) {
@@ -213,9 +232,15 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
             </div>
           </button>
         </div>
-        <button onClick={create} className="btn-primary w-full" disabled={creating}>
-          <Plus size={14} /> {creating ? 'Creating…' : `Create ${backupType === 'world' ? 'world save' : 'full'} backup`}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={create} className="btn-primary flex-1" disabled={creating}>
+            <Plus size={14} /> {creating ? 'Creating…' : `Create ${backupType === 'world' ? 'world save' : 'full'} backup`}
+          </button>
+          <input ref={uploadRef} type="file" accept=".tar.gz" className="hidden" onChange={onUpload} />
+          <button onClick={() => uploadRef.current?.click()} className="btn-ghost" disabled={uploading} title="Import backup (.tar.gz)">
+            <Upload size={14} /> {uploading ? 'Uploading…' : 'Import'}
+          </button>
+        </div>
       </div>
 
       {/* Backup list */}

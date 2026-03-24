@@ -2,11 +2,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { nanoid } from 'nanoid';
 import path from 'path';
 import fs from 'fs';
+import multer from 'multer';
 import { getServer } from '../models/Server';
 import { listBackups, getBackup, createBackup, deleteBackup } from '../models/Backup';
 import { createBackupArchive, createWorldBackupArchive, restoreBackupArchive, detectWorldDirs, detectModpackInfo } from '../services/BackupService';
 import { stopServer, startServer, getServerRuntime } from '../services/DockerManager';
 import { SERVERS_DIR, BACKUPS_DIR } from '../config';
+
+const upload = multer({ dest: '/tmp/mc-backups/' });
 
 const router = Router({ mergeParams: true });
 
@@ -83,6 +86,32 @@ router.post('/:backupId/restore', async (req: Request, res: Response, next: Next
     if (wasRunning) await startServer(server);
 
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/upload', upload.single('file'), (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) return next(Object.assign(new Error('Server not found'), { status: 404 }));
+
+    if (!req.file) return next(Object.assign(new Error('No file uploaded'), { status: 400 }));
+
+    const originalName = req.file.originalname;
+    if (!originalName.endsWith('.tar.gz')) {
+      fs.unlinkSync(req.file.path);
+      return next(Object.assign(new Error('Only .tar.gz backup files are accepted'), { status: 400 }));
+    }
+
+    const id = nanoid(10);
+    const destPath = path.join(BACKUPS_DIR, `${server.id}-${id}.tar.gz`);
+    fs.renameSync(req.file.path, destPath);
+
+    const type: 'full' | 'world' = originalName.includes('_world_') ? 'world' : 'full';
+    const label = originalName.replace(/\.tar\.gz$/, '');
+    const sizeBytes = fs.statSync(destPath).size;
+
+    const record = createBackup({ id, serverId: server.id, label, filePath: destPath, sizeBytes, type });
+    res.status(201).json({ success: true, data: record });
   } catch (err) { next(err); }
 });
 
