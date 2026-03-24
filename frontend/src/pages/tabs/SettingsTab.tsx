@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import { Save, Copy } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useServersStore, type Server } from '../../stores/serversStore';
 
@@ -23,6 +24,7 @@ const JAVA_VERSIONS = [
 
 export default function SettingsTab({ server }: { server: Server }) {
   const setServers = useServersStore((s) => s.setServers);
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: server.name,
     port: server.port,
@@ -32,6 +34,7 @@ export default function SettingsTab({ server }: { server: Server }) {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [error, setError] = useState('');
   const [diskUsage, setDiskUsage] = useState<DiskUsage | null>(null);
 
@@ -108,9 +111,31 @@ export default function SettingsTab({ server }: { server: Server }) {
           <div className="bg-red-900/30 border border-red-700 text-red-400 rounded px-3 py-2 text-sm">{error}</div>
         )}
 
-        <button type="submit" className="btn-primary" disabled={saving}>
-          <Save size={14} /> {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Settings'}
-        </button>
+        <div className="flex gap-2">
+          <button type="submit" className="btn-primary" disabled={saving}>
+            <Save size={14} /> {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Settings'}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={duplicating}
+            onClick={async () => {
+              setDuplicating(true);
+              try {
+                const copy = await api.post<Server>(`/servers/${server.id}/duplicate`);
+                const servers = await api.get<Server[]>('/servers');
+                setServers(servers);
+                navigate(`/servers/${copy.id}/settings`);
+              } catch (err: unknown) {
+                setError(err instanceof Error ? err.message : 'Duplicate failed');
+              } finally {
+                setDuplicating(false);
+              }
+            }}
+          >
+            <Copy size={14} /> {duplicating ? 'Duplicating…' : 'Duplicate'}
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -93,6 +93,37 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   } catch (err) { next(err); }
 });
 
+// Duplicate server (copies all files — server must be stopped)
+router.post('/:id/duplicate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) return next(Object.assign(new Error('Server not found'), { status: 404 }));
+
+    const rt = getServerRuntime(server.id);
+    if (rt.status !== 'stopped' && rt.status !== 'crashed') {
+      return next(Object.assign(new Error('Server must be stopped before duplicating'), { status: 409 }));
+    }
+
+    const { nanoid } = await import('nanoid');
+    const newId = nanoid(10);
+    const srcDir = path.join(SERVERS_DIR, server.id);
+    const destDir = path.join(SERVERS_DIR, newId);
+    const hostDirectory = path.join(await getHostDataDir(), 'servers', newId);
+
+    fs.cpSync(srcDir, destDir, { recursive: true });
+
+    const copy = createServer({
+      ...server,
+      id: newId,
+      name: `${server.name} (copy)`,
+      rconPassword: nanoid(24),
+      hostDirectory,
+    });
+
+    res.status(201).json({ success: true, data: copy });
+  } catch (err) { next(err); }
+});
+
 // Disk usage
 router.get('/:id/disk-usage', (req: Request, res: Response, next: NextFunction) => {
   try {
