@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { Plus, Upload, MemoryStick, Users, Server, AlertTriangle } from 'lucide-react';
+import { Plus, MemoryStick, Users, Server, AlertTriangle } from 'lucide-react';
 import { useServersStore } from '../stores/serversStore';
 import StatusBadge from '../components/StatusBadge';
 
@@ -34,11 +34,8 @@ export default function Dashboard() {
           <p className="text-mc-muted text-sm mt-1">{running} of {servers.length} servers running</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => navigate('/servers/import')} className="btn-ghost text-sm">
-            <Upload size={15} /> <span className="hidden sm:inline">Import Prism</span>
-          </button>
           <button onClick={() => navigate('/servers/new')} className="btn-primary text-sm">
-            <Plus size={15} /> New Server
+            <Plus size={15} /> Add Server
           </button>
         </div>
       </div>
@@ -78,11 +75,8 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold text-gray-300 mb-2">No servers yet</h2>
           <p className="text-mc-muted mb-6">Create a new server or import a Prism Launcher export to get started.</p>
           <div className="flex gap-3">
-            <button onClick={() => navigate('/servers/import')} className="btn-ghost">
-              <Upload size={16} /> Import from Prism
-            </button>
             <button onClick={() => navigate('/servers/new')} className="btn-primary">
-              <Plus size={16} /> Create Server
+              <Plus size={16} /> Add Server
             </button>
           </div>
         </div>

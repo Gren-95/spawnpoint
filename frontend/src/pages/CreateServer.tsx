@@ -1,32 +1,111 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { Server, Upload, Archive, ChevronLeft } from 'lucide-react';
+import { api, uploadPrismExport } from '../api/client';
 import { useServersStore } from '../stores/serversStore';
-import type { Server } from '../stores/serversStore';
+import type { Server as ServerType } from '../stores/serversStore';
+
+// ── shared constants ────────────────────────────────────────────────────────
+
+const JAVA_VERSIONS = [
+  { value: '8',        label: 'Java 8' },
+  { value: '11',       label: 'Java 11' },
+  { value: '17',       label: 'Java 17' },
+  { value: '21',       label: 'Java 21 (recommended)' },
+  { value: '21-graal', label: 'Java 21 GraalVM' },
+  { value: '22',       label: 'Java 22 (latest)' },
+];
 
 const SERVER_TYPES = ['vanilla', 'paper', 'spigot', 'purpur', 'fabric', 'forge', 'neoforge', 'quilt', 'bungeecord', 'velocity'] as const;
-
 const TYPE_LABELS: Record<string, string> = {
   vanilla: 'Vanilla', paper: 'Paper', spigot: 'Spigot', purpur: 'Purpur',
   fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge', quilt: 'Quilt',
   bungeecord: 'BungeeCord', velocity: 'Velocity',
 };
-
 const POPULAR_VERSIONS = ['1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20.4', '1.20.1', '1.19.4', '1.18.2', '1.16.5', '1.12.2', '1.8.9'];
 
-const JAVA_VERSIONS = [
-  { value: '8',       label: 'Java 8' },
-  { value: '11',      label: 'Java 11' },
-  { value: '17',      label: 'Java 17' },
-  { value: '21',      label: 'Java 21 (recommended)' },
-  { value: '21-graal',label: 'Java 21 GraalVM' },
-  { value: '22',      label: 'Java 22 (latest)' },
-];
+type Mode = 'pick' | 'new' | 'prism' | 'backup';
+
+// ── root component ───────────────────────────────────────────────────────────
 
 export default function CreateServer() {
   const navigate = useNavigate();
   const setServers = useServersStore((s) => s.setServers);
+  const [mode, setMode] = useState<Mode>('pick');
 
+  async function refresh() {
+    const servers = await api.get<ServerType[]>('/servers');
+    setServers(servers);
+  }
+
+  if (mode === 'new')    return <NewForm    onBack={() => setMode('pick')} onDone={async (id) => { await refresh(); navigate(`/servers/${id}`); }} />;
+  if (mode === 'prism')  return <PrismForm  onBack={() => setMode('pick')} onDone={async (id) => { await refresh(); navigate(`/servers/${id}`); }} />;
+  if (mode === 'backup') return <BackupForm onBack={() => setMode('pick')} onDone={async (id) => { await refresh(); navigate(`/servers/${id}`); }} />;
+
+  return (
+    <div className="p-6 max-w-2xl">
+      <h1 className="text-2xl font-bold mb-2">Add Server</h1>
+      <p className="text-mc-muted text-sm mb-8">Choose how you want to create your server.</p>
+
+      <div className="grid grid-cols-1 gap-4">
+        <button
+          onClick={() => setMode('new')}
+          className="card p-5 text-left hover:border-mc-green/60 transition-colors group flex items-start gap-4"
+        >
+          <div className="p-2.5 rounded-lg bg-mc-green/10 text-mc-green group-hover:bg-mc-green/20 transition-colors flex-shrink-0">
+            <Server size={22} />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-100 group-hover:text-mc-green transition-colors">New Server</div>
+            <div className="text-sm text-mc-muted mt-0.5">Start from scratch. Choose type, version, and settings.</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setMode('prism')}
+          className="card p-5 text-left hover:border-mc-green/60 transition-colors group flex items-start gap-4"
+        >
+          <div className="p-2.5 rounded-lg bg-mc-green/10 text-mc-green group-hover:bg-mc-green/20 transition-colors flex-shrink-0">
+            <Upload size={22} />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-100 group-hover:text-mc-green transition-colors">Import from Prism Launcher</div>
+            <div className="text-sm text-mc-muted mt-0.5">Upload a Prism export .zip — mods, configs and version auto-detected.</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setMode('backup')}
+          className="card p-5 text-left hover:border-mc-green/60 transition-colors group flex items-start gap-4"
+        >
+          <div className="p-2.5 rounded-lg bg-mc-green/10 text-mc-green group-hover:bg-mc-green/20 transition-colors flex-shrink-0">
+            <Archive size={22} />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-100 group-hover:text-mc-green transition-colors">Import from Backup</div>
+            <div className="text-sm text-mc-muted mt-0.5">Restore a full .tar.gz backup as a new server.</div>
+          </div>
+        </button>
+      </div>
+
+      <button onClick={() => navigate('/')} className="btn-ghost mt-6">Cancel</button>
+    </div>
+  );
+}
+
+// ── back button ──────────────────────────────────────────────────────────────
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-1.5 text-sm text-mc-muted hover:text-gray-200 mb-6 transition-colors">
+      <ChevronLeft size={16} /> Back
+    </button>
+  );
+}
+
+// ── new server form ──────────────────────────────────────────────────────────
+
+function NewForm({ onBack, onDone }: { onBack: () => void; onDone: (id: string) => void }) {
   const [form, setForm] = useState({
     name: '', type: 'paper', mcVersion: '1.21.4',
     port: 25565, memoryMb: 2048,
@@ -35,7 +114,6 @@ export default function CreateServer() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
 
   async function submit(e: React.FormEvent) {
@@ -43,19 +121,17 @@ export default function CreateServer() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/servers', form);
-      const servers = await api.get<Server[]>('/servers');
-      setServers(servers);
-      navigate('/');
+      const server = await api.post<ServerType>('/servers', form);
+      onDone(server.id);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create server');
-    } finally {
       setLoading(false);
     }
   }
 
   return (
     <div className="p-6 max-w-2xl">
+      <BackButton onClick={onBack} />
       <h1 className="text-2xl font-bold mb-6">New Server</h1>
 
       <form onSubmit={submit} className="space-y-5">
@@ -68,21 +144,12 @@ export default function CreateServer() {
           <div>
             <label className="label">Server Type</label>
             <select className="input" value={form.type} onChange={e => set('type', e.target.value)}>
-              {SERVER_TYPES.map(t => (
-                <option key={t} value={t}>{TYPE_LABELS[t]}</option>
-              ))}
+              {SERVER_TYPES.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
             </select>
           </div>
           <div>
             <label className="label">Minecraft Version</label>
-            <input
-              className="input"
-              list="mc-versions"
-              value={form.mcVersion}
-              onChange={e => set('mcVersion', e.target.value)}
-              placeholder="1.21.4"
-              required
-            />
+            <input className="input" list="mc-versions" value={form.mcVersion} onChange={e => set('mcVersion', e.target.value)} placeholder="1.21.4" required />
             <datalist id="mc-versions">
               {POPULAR_VERSIONS.map(v => <option key={v} value={v} />)}
             </datalist>
@@ -112,16 +179,235 @@ export default function CreateServer() {
           <p className="text-xs text-mc-muted mt-1">Additional JVM arguments passed to Java</p>
         </div>
 
-        {error && (
-          <div className="bg-red-900/30 border border-red-700 text-red-400 rounded px-3 py-2 text-sm">{error}</div>
+        {error && <div className="bg-red-900/30 border border-red-700 text-red-400 rounded px-3 py-2 text-sm">{error}</div>}
+
+        <button type="submit" className="btn-primary w-full" disabled={loading}>
+          {loading ? 'Creating…' : 'Create Server'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ── prism import form ────────────────────────────────────────────────────────
+
+function PrismForm({ onBack, onDone }: { onBack: () => void; onDone: (id: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState('');
+  const [port, setPort] = useState(25565);
+  const [memoryMb, setMemoryMb] = useState(2048);
+  const [javaVersion, setJavaVersion] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ mcVersion: string; serverType: string; loaderVersion?: string; javaVersion: string; mods: string[]; modsFound: number } | null>(null);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    if (!name) setName(f.name.replace(/\.zip$/, ''));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    setError('');
+    setLoading(true);
+    try {
+      const data = await uploadPrismExport(file, { name: name || undefined, port, memoryMb, javaVersion }) as { server: ServerType; importInfo: typeof result };
+      setResult(data.importInfo);
+      setTimeout(() => onDone(data.server.id), 1500);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Import failed');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-2xl">
+      <BackButton onClick={onBack} />
+      <h1 className="text-2xl font-bold mb-2">Import from Prism Launcher</h1>
+      <p className="text-mc-muted text-sm mb-6">
+        Export an instance from Prism Launcher (<strong className="text-gray-300">Right-click → Export Instance</strong>), then upload the .zip here.
+      </p>
+
+      <form onSubmit={submit} className="space-y-5">
+        <div
+          onClick={() => fileRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${file ? 'border-mc-green/60 bg-mc-green/5' : 'border-mc-border hover:border-gray-500'}`}
+        >
+          <input ref={fileRef} type="file" accept=".zip" className="hidden" onChange={onFile} />
+          <Upload size={32} className="mx-auto mb-2 text-mc-muted" />
+          {file ? (
+            <div>
+              <div className="font-medium text-mc-green">{file.name}</div>
+              <div className="text-xs text-mc-muted mt-1">{(file.size / 1024 / 1024).toFixed(1)} MB</div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-gray-300">Click to select Prism export .zip</div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="label">Server Name (optional)</label>
+          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Auto-detected from export" />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="label">Port</label>
+            <input className="input" type="number" min={1} max={65535} value={port} onChange={e => setPort(parseInt(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Memory (MB)</label>
+            <input className="input" type="number" min={512} step={512} value={memoryMb} onChange={e => setMemoryMb(parseInt(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Java Version</label>
+            <select className="input" value={javaVersion} onChange={e => setJavaVersion(e.target.value)}>
+              <option value="">Auto-detect</option>
+              {JAVA_VERSIONS.map(j => <option key={j.value} value={j.value}>{j.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {result && (
+          <div className="bg-mc-green/10 border border-mc-green/40 rounded p-4 text-sm space-y-1">
+            <div className="font-medium text-mc-green">Import successful! Redirecting…</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+              <span className="text-mc-muted">Type</span><span className="text-white capitalize">{result.serverType}</span>
+              <span className="text-mc-muted">MC Version</span><span className="text-white">{result.mcVersion}</span>
+              {result.loaderVersion && <><span className="text-mc-muted">Loader</span><span className="text-white">{result.loaderVersion}</span></>}
+              <span className="text-mc-muted">Java</span><span className="text-white">Java {result.javaVersion}</span>
+              <span className="text-mc-muted">Mods</span><span className="text-white">{result.modsFound}</span>
+            </div>
+          </div>
         )}
 
-        <div className="flex gap-3 pt-2">
-          <button type="button" onClick={() => navigate('/')} className="btn-ghost">Cancel</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Creating…' : 'Create Server'}
-          </button>
+        {error && <div className="bg-red-900/30 border border-red-700 text-red-400 rounded px-3 py-2 text-sm">{error}</div>}
+
+        <button type="submit" className="btn-primary w-full" disabled={!file || loading}>
+          {loading ? 'Importing…' : 'Import Server'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ── backup import form ───────────────────────────────────────────────────────
+
+function BackupForm({ onBack, onDone }: { onBack: () => void; onDone: (id: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState('');
+  const [port, setPort] = useState(25565);
+  const [memoryMb, setMemoryMb] = useState(2048);
+  const [javaVersion, setJavaVersion] = useState('21');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [detected, setDetected] = useState<{ mcVersion?: string; loader?: string; loaderVersion?: string; name?: string; version?: string } | null>(null);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    if (!name) setName(f.name.replace(/\.tar\.gz$/, ''));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    setError('');
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.append('backup', file);
+      form.append('name', name);
+      form.append('port', String(port));
+      form.append('memoryMb', String(memoryMb));
+      form.append('javaVersion', javaVersion);
+
+      const res = await fetch('/api/backups/import-as-server', { method: 'POST', body: form });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message ?? 'Import failed');
+
+      setDetected(json.data.detected);
+      setTimeout(() => onDone(json.data.server.id), 1500);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Import failed');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-2xl">
+      <BackButton onClick={onBack} />
+      <h1 className="text-2xl font-bold mb-2">Import from Backup</h1>
+      <p className="text-mc-muted text-sm mb-6">
+        Upload a <strong className="text-gray-300">.tar.gz</strong> full backup to create a new server with all files restored.
+      </p>
+
+      <form onSubmit={submit} className="space-y-5">
+        <div
+          onClick={() => fileRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${file ? 'border-mc-green/60 bg-mc-green/5' : 'border-mc-border hover:border-gray-500'}`}
+        >
+          <input ref={fileRef} type="file" accept=".tar.gz" className="hidden" onChange={onFile} />
+          <Archive size={32} className="mx-auto mb-2 text-mc-muted" />
+          {file ? (
+            <div>
+              <div className="font-medium text-mc-green">{file.name}</div>
+              <div className="text-xs text-mc-muted mt-1">{(file.size / 1024 / 1024).toFixed(1)} MB</div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-gray-300">Click to select a .tar.gz backup</div>
+              <div className="text-xs text-mc-muted mt-1">Full backups only</div>
+            </div>
+          )}
         </div>
+
+        <div>
+          <label className="label">Server Name</label>
+          <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Auto-detected from backup" />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="label">Port</label>
+            <input className="input" type="number" min={1} max={65535} value={port} onChange={e => setPort(parseInt(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Memory (MB)</label>
+            <input className="input" type="number" min={512} step={512} value={memoryMb} onChange={e => setMemoryMb(parseInt(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Java Version</label>
+            <select className="input" value={javaVersion} onChange={e => setJavaVersion(e.target.value)}>
+              {JAVA_VERSIONS.map(j => <option key={j.value} value={j.value}>{j.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {detected && (
+          <div className="bg-mc-green/10 border border-mc-green/40 rounded p-4 text-sm space-y-1">
+            <div className="font-medium text-mc-green">Import successful! Redirecting…</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+              {detected.mcVersion && <><span className="text-mc-muted">MC Version</span><span className="text-white">{detected.mcVersion}</span></>}
+              {detected.loader && <><span className="text-mc-muted">Loader</span><span className="text-white capitalize">{detected.loader}{detected.loaderVersion ? ` ${detected.loaderVersion}` : ''}</span></>}
+              {detected.name && <><span className="text-mc-muted">Modpack</span><span className="text-white">{detected.name}{detected.version ? ` v${detected.version}` : ''}</span></>}
+            </div>
+          </div>
+        )}
+
+        {error && <div className="bg-red-900/30 border border-red-700 text-red-400 rounded px-3 py-2 text-sm">{error}</div>}
+
+        <button type="submit" className="btn-primary w-full" disabled={!file || loading}>
+          {loading ? 'Importing…' : 'Import Server'}
+        </button>
       </form>
     </div>
   );
