@@ -72,20 +72,35 @@ export function detectModpackInfo(serverDir: string): ModpackInfo {
   } catch { /* not present */ }
 
   // itzg/minecraft-server loader manifests (fallback — gives MC + loader versions)
-  const loaderManifests = [
-    { file: '.neoforge-manifest.json', loader: 'neoforge', mcKey: 'minecraftVersion', verKey: 'forgeVersion' },
-    { file: '.forge-manifest.json',    loader: 'forge',    mcKey: 'minecraftVersion', verKey: 'forgeVersion' },
-    { file: '.fabric.env',             loader: 'fabric',   mcKey: null,               verKey: null },
-  ];
-  for (const { file, loader, mcKey, verKey } of loaderManifests) {
+  if (!info.loader) {
     try {
-      const raw = JSON.parse(fs.readFileSync(path.join(serverDir, file), 'utf8'));
-      if (!info.mcVersion && mcKey && raw[mcKey]) info.mcVersion = raw[mcKey];
-      if (!info.loader) {
+      const raw = JSON.parse(fs.readFileSync(path.join(serverDir, '.fabric-manifest.json'), 'utf8'));
+      if (!info.mcVersion && raw.origin?.game) info.mcVersion = raw.origin.game;
+      info.loader = 'fabric';
+      if (raw.origin?.loader) info.loaderVersion = raw.origin.loader;
+    } catch { /* not present */ }
+  }
+  if (!info.loader) {
+    const neoforgeManifests = [
+      { file: '.neoforge-manifest.json', loader: 'neoforge', mcKey: 'minecraftVersion', verKey: 'forgeVersion' },
+      { file: '.forge-manifest.json',    loader: 'forge',    mcKey: 'minecraftVersion', verKey: 'forgeVersion' },
+    ];
+    for (const { file, loader, mcKey, verKey } of neoforgeManifests) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.join(serverDir, file), 'utf8'));
+        if (!info.mcVersion && raw[mcKey]) info.mcVersion = raw[mcKey];
         info.loader = loader;
-        if (verKey && raw[verKey]) info.loaderVersion = raw[verKey];
-      }
-      break;
+        if (raw[verKey]) info.loaderVersion = raw[verKey];
+        break;
+      } catch { /* not present */ }
+    }
+  }
+  if (!info.loader) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(serverDir, '.papermc-manifest.json'), 'utf8'));
+      if (!info.mcVersion && raw.minecraftVersion) info.mcVersion = raw.minecraftVersion;
+      info.loader = raw.project ?? 'paper';
+      if (raw.build) info.loaderVersion = String(raw.build);
     } catch { /* not present */ }
   }
 
