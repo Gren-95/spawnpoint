@@ -58,7 +58,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             }
           >
             <Server size={14} className="flex-shrink-0" />
-            <span className="truncate flex-1">{sv.name}</span>
+            <span className="truncate flex-1" title={sv.name}>{sv.name}</span>
             <StatusBadge status={sv.runtime.status} dot />
           </NavLink>
         ))}
