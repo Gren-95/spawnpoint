@@ -102,11 +102,16 @@ export default function FilesTab({ serverId }: { serverId: string }) {
     if (renamingPath) setTimeout(() => renameInputRef.current?.focus(), 0);
   }, [renamingPath]);
 
+  const MAX_EDIT_SIZE = 1 * 1024 * 1024; // 1 MB
+
   async function openFile(entry: Entry) {
     if (entry.isDir) { loadDir(entry.path); return; }
     if (!isTextFile(entry.name)) {
-      // Offer download for binary files
       window.open(`/api/servers/${serverId}/files/download?path=${encodeURIComponent(entry.path)}`, '_blank');
+      return;
+    }
+    if (entry.size > MAX_EDIT_SIZE) {
+      setDirError(`"${entry.name}" is too large to edit (${fmtSize(entry.size)}). Download it instead.`);
       return;
     }
     setSaveError('');
