@@ -97,13 +97,17 @@ export default function Dashboard() {
               </div>
 
               <div className="grid grid-cols-3 gap-2 mt-4">
-                <MetricItem
+                <BarMetricItem
                   label="CPU"
                   value={sv.runtime.status === 'running' ? `${sv.runtime.metrics.cpuPercent.toFixed(1)}%` : '—'}
+                  pct={sv.runtime.status === 'running' ? sv.runtime.metrics.cpuPercent / 100 : null}
+                  color={sv.runtime.metrics.cpuPercent > 80 ? 'red' : sv.runtime.metrics.cpuPercent > 50 ? 'yellow' : 'green'}
                 />
-                <MetricItem
+                <BarMetricItem
                   label="RAM"
                   value={sv.runtime.status === 'running' ? `${sv.runtime.metrics.ramMb} MB` : '—'}
+                  pct={sv.runtime.status === 'running' ? sv.runtime.metrics.ramMb / sv.memoryMb : null}
+                  color={sv.runtime.metrics.ramMb / sv.memoryMb > 0.9 ? 'red' : sv.runtime.metrics.ramMb / sv.memoryMb > 0.7 ? 'yellow' : 'green'}
                 />
                 <MetricItem
                   label="Players"
@@ -133,6 +137,32 @@ function MetricItem({ label, value }: { label: string; value: string }) {
     <div className="bg-mc-dark rounded p-2 text-center">
       <div className="text-xs text-mc-muted">{label}</div>
       <div className="text-sm font-medium text-gray-200 mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+const BAR_COLORS = {
+  green: 'bg-mc-green',
+  yellow: 'bg-yellow-400',
+  red: 'bg-red-500',
+};
+
+function BarMetricItem({ label, value, pct, color }: {
+  label: string; value: string;
+  pct: number | null; color: 'green' | 'yellow' | 'red';
+}) {
+  return (
+    <div className="bg-mc-dark rounded p-2 text-center">
+      <div className="text-xs text-mc-muted">{label}</div>
+      <div className="text-sm font-medium text-gray-200 mt-0.5">{value}</div>
+      <div className="mt-1.5 h-1 rounded-full bg-mc-border overflow-hidden">
+        {pct !== null && (
+          <div
+            className={`h-full rounded-full transition-all duration-700 ${BAR_COLORS[color]}`}
+            style={{ width: `${Math.min(pct * 100, 100)}%` }}
+          />
+        )}
+      </div>
     </div>
   );
 }

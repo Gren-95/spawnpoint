@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Copy, Check, Trash2 } from 'lucide-react';
+import { Send, Copy, Check, Trash2, Star, X } from 'lucide-react';
 import { useConsole, sendWs } from '../../hooks/useServerSocket';
 import { useServersStore } from '../../stores/serversStore';
 import { api } from '../../api/client';
@@ -19,8 +19,13 @@ function colorize(line: string): string {
 export default function ConsoleTab({ serverId }: { serverId: string }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`console_history_${serverId}`) ?? '[]'); } catch { return []; }
+  });
   const [histIdx, setHistIdx] = useState(-1);
+  const [favourites, setFavourites] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`console_favourites_${serverId}`) ?? '[]'); } catch { return []; }
+  });
   const [copied, setCopied] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,9 +71,21 @@ export default function ConsoleTab({ serverId }: { serverId: string }) {
     const cmd = input.trim();
     if (!cmd) return;
     sendWs({ type: 'console_command', serverId, command: cmd });
-    setHistory((h) => [cmd, ...h.slice(0, 99)]);
+    setHistory((h) => {
+      const next = [cmd, ...h.filter((c) => c !== cmd).slice(0, 99)];
+      localStorage.setItem(`console_history_${serverId}`, JSON.stringify(next));
+      return next;
+    });
     setHistIdx(-1);
     setInput('');
+  }
+
+  function toggleFavourite(cmd: string) {
+    setFavourites((prev) => {
+      const next = prev.includes(cmd) ? prev.filter((c) => c !== cmd) : [...prev, cmd];
+      localStorage.setItem(`console_favourites_${serverId}`, JSON.stringify(next));
+      return next;
+    });
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -104,6 +121,30 @@ export default function ConsoleTab({ serverId }: { serverId: string }) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Favourites chips */}
+      {favourites.length > 0 && (
+        <div className="border-t border-mc-border px-3 py-1.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <Star size={11} className="text-yellow-400 flex-shrink-0" />
+          {favourites.map((fav) => (
+            <div key={fav} className="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                onClick={() => setInput(fav)}
+                className="font-mono text-xs bg-mc-panel border border-mc-border hover:border-mc-green text-gray-300 hover:text-mc-green rounded px-2 py-0.5 transition-colors"
+              >
+                {fav}
+              </button>
+              <button
+                onClick={() => toggleFavourite(fav)}
+                className="text-mc-muted hover:text-red-400 p-0.5"
+                title="Remove favourite"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t border-mc-border p-3 flex gap-2">
         <button onClick={clearConsole} className="btn-ghost p-1.5" title="Clear console">
@@ -122,6 +163,14 @@ export default function ConsoleTab({ serverId }: { serverId: string }) {
           placeholder="Enter command…"
           autoFocus
         />
+        <button
+          onClick={() => input.trim() && toggleFavourite(input.trim())}
+          className={`btn-ghost p-1.5 ${favourites.includes(input.trim()) ? 'text-yellow-400' : ''}`}
+          title={favourites.includes(input.trim()) ? 'Remove from favourites' : 'Add to favourites'}
+          disabled={!input.trim()}
+        >
+          <Star size={14} />
+        </button>
         <button onClick={sendCommand} className="btn-ghost p-1.5" disabled={!input.trim()}>
           <Send size={14} />
         </button>
