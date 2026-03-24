@@ -12,6 +12,7 @@ interface ServerRow {
   java_version: string;
   rcon_password: string;
   host_directory: string;
+  tags: string;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +29,7 @@ function rowToConfig(row: ServerRow): ServerConfig {
     javaVersion: row.java_version ?? '21',
     rconPassword: row.rcon_password,
     hostDirectory: row.host_directory,
+    tags: JSON.parse(row.tags ?? '[]'),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -61,7 +63,7 @@ export function createServer(config: Omit<ServerConfig, 'createdAt' | 'updatedAt
   return getServer(config.id)!;
 }
 
-export function updateServer(id: string, patch: Partial<Pick<ServerConfig, 'name' | 'jvmFlags' | 'memoryMb' | 'port' | 'javaVersion'>>): ServerConfig | undefined {
+export function updateServer(id: string, patch: Partial<Pick<ServerConfig, 'name' | 'jvmFlags' | 'memoryMb' | 'port' | 'javaVersion' | 'tags'>>): ServerConfig | undefined {
   const fields: string[] = [];
   const params: Record<string, unknown> = { $id: id };
 
@@ -70,6 +72,7 @@ export function updateServer(id: string, patch: Partial<Pick<ServerConfig, 'name
   if (patch.memoryMb !== undefined) { fields.push('memory_mb = $memoryMb'); params.$memoryMb = patch.memoryMb; }
   if (patch.port !== undefined) { fields.push('port = $port'); params.$port = patch.port; }
   if (patch.javaVersion !== undefined) { fields.push('java_version = $javaVersion'); params.$javaVersion = patch.javaVersion; }
+  if (patch.tags !== undefined) { fields.push('tags = $tags'); params.$tags = JSON.stringify(patch.tags); }
 
   if (fields.length === 0) return getServer(id);
 

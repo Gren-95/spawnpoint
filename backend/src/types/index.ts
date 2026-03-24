@@ -22,6 +22,7 @@ export interface ServerConfig {
   javaVersion: string;
   rconPassword: string;
   hostDirectory: string;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }

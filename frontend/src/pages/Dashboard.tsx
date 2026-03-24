@@ -4,10 +4,18 @@ import { Plus, MemoryStick, Users, Server, AlertTriangle } from 'lucide-react';
 import { useServersStore } from '../stores/serversStore';
 import StatusBadge from '../components/StatusBadge';
 
+const TAG_PALETTE = ['#4ade80','#60a5fa','#f472b6','#fb923c','#a78bfa','#34d399','#facc15','#f87171'];
+function tagColor(tag: string): string {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) >>> 0;
+  return TAG_PALETTE[hash % TAG_PALETTE.length];
+}
+
 export default function Dashboard() {
   const servers = useServersStore((s) => s.servers);
   const navigate = useNavigate();
   const [dockerAvailable, setDockerAvailable] = useState(true);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/health')
@@ -17,6 +25,8 @@ export default function Dashboard() {
   }, []);
 
   const running = servers.filter(s => s.runtime.status === 'running').length;
+  const allTags = [...new Set(servers.flatMap(s => s.tags ?? []))].sort();
+  const visibleServers = activeTag ? servers.filter(s => (s.tags ?? []).includes(activeTag)) : servers;
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -68,6 +78,30 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setActiveTag(null)}
+            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${!activeTag ? 'border-mc-green text-mc-green bg-mc-green/10' : 'border-mc-border text-mc-muted hover:border-gray-500'}`}
+          >
+            All
+          </button>
+          {allTags.map(tag => (
+            <button
+              key={tag}
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+              className="text-xs px-2.5 py-1 rounded-full border transition-colors"
+              style={activeTag === tag
+                ? { borderColor: tagColor(tag), color: tagColor(tag), backgroundColor: tagColor(tag) + '22' }
+                : { borderColor: '#374151', color: '#9ca3af' }}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Server cards */}
       {servers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -82,7 +116,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {servers.map((sv) => (
+          {visibleServers.map((sv) => (
             <button
               key={sv.id}
               onClick={() => navigate(`/servers/${sv.id}`)}
@@ -92,6 +126,16 @@ export default function Dashboard() {
                 <div>
                   <div className="font-bold text-gray-100 group-hover:text-mc-green transition-colors">{sv.name}</div>
                   <div className="text-xs text-mc-muted mt-0.5">{sv.type} · {sv.mcVersion} · :{sv.port}</div>
+                  {(sv.tags ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {(sv.tags ?? []).map(tag => (
+                        <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full border"
+                          style={{ borderColor: tagColor(tag), color: tagColor(tag), backgroundColor: tagColor(tag) + '22' }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <StatusBadge status={sv.runtime.status} />
               </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Copy } from 'lucide-react';
+import { Save, Copy, X, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useServersStore, type Server } from '../../stores/serversStore';
@@ -31,7 +31,9 @@ export default function SettingsTab({ server }: { server: Server }) {
     memoryMb: server.memoryMb,
     jvmFlags: server.jvmFlags,
     javaVersion: server.javaVersion ?? '21',
+    tags: server.tags ?? [] as string[],
   });
+  const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -90,6 +92,44 @@ export default function SettingsTab({ server }: { server: Server }) {
         </div>
 
         <div>
+          <label className="label">Tags</label>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {form.tags.map((tag) => (
+              <span key={tag} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border"
+                style={{ borderColor: tagColor(tag), color: tagColor(tag), backgroundColor: tagColor(tag) + '22' }}>
+                {tag}
+                <button type="button" onClick={() => set('tags', form.tags.filter(t => t !== tag))} className="opacity-60 hover:opacity-100">
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1"
+              placeholder="Add tag…"
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => {
+                if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                  e.preventDefault();
+                  const t = tagInput.trim().toLowerCase().replace(/\s+/g, '-');
+                  if (!form.tags.includes(t)) set('tags', [...form.tags, t]);
+                  setTagInput('');
+                }
+              }}
+            />
+            <button type="button" className="btn-ghost px-3" onClick={() => {
+              const t = tagInput.trim().toLowerCase().replace(/\s+/g, '-');
+              if (t && !form.tags.includes(t)) { set('tags', [...form.tags, t]); setTagInput(''); }
+            }}>
+              <Plus size={14} />
+            </button>
+          </div>
+          <p className="text-xs text-mc-muted mt-1">Press Enter or comma to add. Used to filter servers on the dashboard.</p>
+        </div>
+
+        <div>
           <label className="label">JVM Flags</label>
           <input className="input" value={form.jvmFlags} onChange={e => set('jvmFlags', e.target.value)} />
         </div>
@@ -139,4 +179,11 @@ export default function SettingsTab({ server }: { server: Server }) {
       </form>
     </div>
   );
+}
+
+const TAG_PALETTE = ['#4ade80','#60a5fa','#f472b6','#fb923c','#a78bfa','#34d399','#facc15','#f87171'];
+function tagColor(tag: string): string {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) >>> 0;
+  return TAG_PALETTE[hash % TAG_PALETTE.length];
 }

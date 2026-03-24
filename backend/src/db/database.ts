@@ -27,4 +27,5 @@ export function initDb(): void {
   // Migrations for existing databases
   try { db.exec("ALTER TABLE servers ADD COLUMN java_version TEXT NOT NULL DEFAULT '21'"); } catch { /* already exists */ }
   try { db.exec("ALTER TABLE backups ADD COLUMN type TEXT NOT NULL DEFAULT 'full'"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE servers ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'"); } catch { /* already exists */ }
 }

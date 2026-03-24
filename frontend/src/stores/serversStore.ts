@@ -33,6 +33,7 @@ export interface Server {
   memoryMb: number;
   jvmFlags: string;
   javaVersion: string;
+  tags: string[];
   createdAt: string;
   runtime: ServerRuntime;
 }
