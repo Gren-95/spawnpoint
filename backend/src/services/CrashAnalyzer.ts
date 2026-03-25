@@ -34,12 +34,27 @@ export function analyzeCrash(consoleBuf: string[], serverDir: string): CrashIssu
     }
   }
 
-  // Java version mismatch
+  // Java version mismatch — Fabric/Forge explicit message
   const javaMatch = buf.match(/requires javaVersion ([\d.]+) or above.*?but ([\d.]+) is available/i);
   if (javaMatch) {
     issues.push({
       type: 'java_version',
       message: `Java version mismatch: requires ${javaMatch[1]}+, but ${javaMatch[2]} is available. Update the Java version in server settings.`,
+      fixable: false,
+    });
+  }
+
+  // Java version mismatch — raw JVM UnsupportedClassVersionError
+  // class file version 69.0 = Java 25, formula: java = classVer - 44
+  const classVerMatch = buf.match(/class file version (\d+)\.0.*?recognizes class file versions up to (\d+)\.0/i)
+    ?? buf.match(/recognizes class file versions up to (\d+)\.0.*?class file version (\d+)\.0/i);
+  if (classVerMatch && !javaMatch) {
+    const [, a, b] = classVerMatch;
+    const required = parseInt(a) - 44;
+    const current  = parseInt(b) - 44;
+    issues.push({
+      type: 'java_version',
+      message: `Java version too old: Minecraft requires Java ${required}, but the server is running Java ${current}. Update the Java version in server settings.`,
       fixable: false,
     });
   }

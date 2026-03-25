@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { nanoid } from 'nanoid';
 import { importPrismExport } from '../services/PrismImporter';
 import { importMrpack } from '../services/MrpackImporter';
@@ -94,6 +95,109 @@ router.post('/import-mrpack', upload.single('export'), async (req: Request, res:
       memoryMb,
       jvmFlags: '-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200',
       javaVersion,
+      rconPassword: nanoid(24),
+      hostDirectory,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        server,
+        importInfo: {
+          name: result.name,
+          versionId: result.versionId,
+          mcVersion: result.mcVersion,
+          serverType: result.serverType,
+          loaderVersion: result.loaderVersion,
+          modsDownloaded: result.modsDownloaded,
+          modsSkipped: result.modsSkipped,
+        },
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// ── Modrinth modpack browser (for new-server flow) ───────────────────────────
+
+const MODPACK_PAGE_SIZE = 20;
+
+router.get('/modpacks/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = (req.query.q as string) ?? '';
+    const offset = parseInt((req.query.offset as string) ?? '0', 10) || 0;
+
+    const facets = [['project_type:modpack']];
+    const params = new URLSearchParams({
+      query: q,
+      facets: JSON.stringify(facets),
+      limit: String(MODPACK_PAGE_SIZE),
+      offset: String(offset),
+      index: 'relevance',
+    });
+
+    const resp = await fetch(`https://api.modrinth.com/v2/search?${params}`, {
+      headers: { 'User-Agent': 'Spawnpoint/1.0 (self-hosted MC manager)' },
+    });
+    if (!resp.ok) throw new Error(`Modrinth API error: ${resp.status}`);
+    const data = await resp.json() as { hits: unknown[]; total_hits: number };
+
+    res.json({ success: true, data: { hits: data.hits, total: data.total_hits } });
+  } catch (err) { next(err); }
+});
+
+router.get('/modpacks/versions/:projectId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const resp = await fetch(
+      `https://api.modrinth.com/v2/project/${req.params.projectId}/version`,
+      { headers: { 'User-Agent': 'Spawnpoint/1.0 (self-hosted MC manager)' } }
+    );
+    if (!resp.ok) throw new Error(`Modrinth API error: ${resp.status}`);
+    const versions = await resp.json();
+    res.json({ success: true, data: versions });
+  } catch (err) { next(err); }
+});
+
+// Install a modpack directly from a Modrinth CDN URL (no file upload needed)
+router.post('/install-from-url', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { packUrl, name, port, memoryMb, javaVersion } = req.body as {
+      packUrl: string; name?: string; port?: number; memoryMb?: number; javaVersion?: string;
+    };
+    if (!packUrl) return next(Object.assign(new Error('packUrl is required'), { status: 400 }));
+    if (!packUrl.startsWith('https://cdn.modrinth.com/')) {
+      return next(Object.assign(new Error('Only Modrinth CDN URLs are accepted'), { status: 400 }));
+    }
+
+    // Download the .mrpack to a temp file
+    const tmpPath = path.join(os.tmpdir(), `mrpack-${nanoid(10)}.mrpack`);
+    const resp = await fetch(packUrl, {
+      headers: { 'User-Agent': 'Spawnpoint/1.0 (self-hosted MC manager)' },
+    });
+    if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+    fs.writeFileSync(tmpPath, Buffer.from(await resp.arrayBuffer()));
+
+    const id = nanoid(10);
+    const serverLocalDir = path.join(SERVERS_DIR, id);
+    const hostDirectory = path.join(await getHostDataDir(), 'servers', id);
+    fs.mkdirSync(serverLocalDir, { recursive: true });
+
+    let result;
+    try {
+      result = await importMrpack(tmpPath, serverLocalDir);
+    } finally {
+      fs.unlinkSync(tmpPath);
+    }
+
+    const serverName = name || result.name;
+    const server = createServer({
+      id,
+      name: serverName,
+      type: result.serverType,
+      mcVersion: result.mcVersion,
+      port: port ?? 25565,
+      memoryMb: memoryMb ?? 4096,
+      jvmFlags: '-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200',
+      javaVersion: javaVersion ?? '21',
       rconPassword: nanoid(24),
       hostDirectory,
     });

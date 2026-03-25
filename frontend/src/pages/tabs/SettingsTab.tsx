@@ -30,7 +30,8 @@ const JAVA_VERSIONS = [
   { value: '17',       label: 'Java 17' },
   { value: '21',       label: 'Java 21 (recommended)' },
   { value: '21-graal', label: 'Java 21 GraalVM' },
-  { value: '22',       label: 'Java 22 (latest)' },
+  { value: '22',       label: 'Java 22' },
+  { value: '25',       label: 'Java 25 (latest)' },
 ];
 
 export default function SettingsTab({ server }: { server: Server }) {
