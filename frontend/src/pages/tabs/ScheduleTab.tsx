@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Clock } from 'lucide-react';
+import { Plus, Trash2, Clock, CalendarX } from 'lucide-react';
 import { api } from '../../api/client';
 
 interface Schedule {
@@ -19,6 +19,26 @@ function fmt12(hour: number, minute: number): string {
   const suffix = hour >= 12 ? 'PM' : 'AM';
   const h = hour % 12 || 12;
   return `${h}:${String(minute).padStart(2, '0')} ${suffix}`;
+}
+
+function nextRun(schedule: Schedule): string {
+  const now = new Date();
+  for (let daysAhead = 0; daysAhead <= 7; daysAhead++) {
+    const candidate = new Date(now);
+    candidate.setDate(candidate.getDate() + daysAhead);
+    const dayOfWeek = candidate.getDay();
+    if (!schedule.days.includes(dayOfWeek)) continue;
+    candidate.setHours(schedule.hour, schedule.minute, 0, 0);
+    if (candidate <= now) continue;
+    const diffMs = candidate.getTime() - now.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffMins < 60) return `in ${diffMins}m`;
+    if (diffHours < 24) return `in ${diffHours}h ${diffMins % 60}m`;
+    if (daysAhead === 1) return `tomorrow at ${fmt12(schedule.hour, schedule.minute)}`;
+    return `${DAY_LABELS[dayOfWeek]} at ${fmt12(schedule.hour, schedule.minute)}`;
+  }
+  return '';
 }
 
 function DayPicker({ days, onChange }: { days: number[]; onChange: (d: number[]) => void }) {
@@ -176,6 +196,9 @@ function ScheduleRow({ schedule, serverId, onChanged }: {
           <span className="font-mono">{fmt12(schedule.hour, schedule.minute)}</span>
         </div>
         <div className="text-xs text-mc-muted mt-0.5">{daysLabel}</div>
+        {schedule.enabled && nextRun(schedule) && (
+          <div className="text-xs text-mc-green/70 mt-0.5">Next: {nextRun(schedule)}</div>
+        )}
       </div>
       <button
         onClick={toggle}
@@ -225,11 +248,19 @@ export default function ScheduleTab({ serverId }: { serverId: string }) {
         <div className="bg-red-900/30 border border-red-700 text-red-400 rounded px-3 py-2 text-sm">{error}</div>
       )}
 
-      {schedules.length > 0 && (
+      {schedules.length > 0 ? (
         <div className="card overflow-hidden">
           {schedules.map(s => (
             <ScheduleRow key={s.id} schedule={s} serverId={serverId} onChanged={load} />
           ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <CalendarX size={32} className="text-mc-muted opacity-40" />
+          <div>
+            <p className="text-sm text-mc-muted">No schedules yet</p>
+            <p className="text-xs text-mc-muted/60 mt-1">Add a schedule to automatically start or stop this server at set times.</p>
+          </div>
         </div>
       )}
 

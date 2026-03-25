@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Archive, RotateCw, Trash2, Download, Plus, Globe, HardDrive, Package, Upload, Clock } from 'lucide-react';
+import { Archive, RotateCw, Trash2, Download, Plus, Globe, HardDrive, Package, Upload, Clock, Loader2 } from 'lucide-react';
 import { api } from '../../api/client';
+import { useServersStore } from '../../stores/serversStore';
 
 interface Backup {
   id: string;
@@ -45,6 +46,7 @@ const INTERVAL_OPTIONS = [
 ];
 
 export default function BackupsTab({ serverId }: { serverId: string }) {
+  const backingUp = useServersStore((s) => s.servers.find((sv) => sv.id === serverId)?.runtime.backingUp ?? false);
   const [data, setData] = useState<BackupsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -62,6 +64,8 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
     backupLastAt: null,
   });
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [announceEnabled, setAnnounceEnabled] = useState(false);
+  const [announceMessage, setAnnounceMessage] = useState('World save starting, expect brief lag…');
 
   const label = baseLabel ? `${baseLabel}_${backupType}` : '';
 
@@ -121,6 +125,7 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
       await api.post(`/servers/${serverId}/backups`, {
         label: label || undefined,
         type: backupType,
+        announceMessage: announceEnabled ? announceMessage : undefined,
       });
       setBaseLabel(suggestedBase);
       load();
@@ -193,6 +198,12 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
 
   return (
     <div className="p-4 space-y-4">
+      {backingUp && (
+        <div className="flex items-center gap-2 bg-mc-green/10 border border-mc-green/30 rounded px-3 py-2 text-sm text-mc-green">
+          <Loader2 size={14} className="animate-spin flex-shrink-0" />
+          Auto-backup in progress…
+        </div>
+      )}
       {/* World save info */}
       {worldDirs.length > 0 && (
         <div className="card p-3 flex items-start gap-3 text-sm">
@@ -333,6 +344,27 @@ export default function BackupsTab({ serverId }: { serverId: string }) {
               <div className="text-xs opacity-70">Everything · slower</div>
             </div>
           </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAnnounceEnabled(v => !v)}
+            className={`text-xs px-2.5 py-1 rounded border transition-colors flex-shrink-0 ${
+              announceEnabled
+                ? 'border-mc-green bg-mc-green/10 text-mc-green'
+                : 'border-mc-border text-mc-muted hover:border-gray-500'
+            }`}
+          >
+            Announce
+          </button>
+          {announceEnabled && (
+            <input
+              className="input flex-1 text-xs py-1"
+              value={announceMessage}
+              onChange={e => setAnnounceMessage(e.target.value)}
+              placeholder="Message to broadcast in-game…"
+            />
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={create} className="btn-primary flex-1" disabled={creating}>

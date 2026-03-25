@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { listServers, updateServer } from '../models/Server';
 import { listBackups, createBackup, deleteBackup } from '../models/Backup';
 import { createBackupArchive } from './BackupService';
+import { setBackingUp } from './DockerManager';
 import { SERVERS_DIR, BACKUPS_DIR } from '../config';
 
 let interval: NodeJS.Timeout | null = null;
@@ -27,10 +28,13 @@ async function tick(): Promise<void> {
 
     if (now - lastAt < intervalMs) continue;
 
+    setBackingUp(server.id, true);
     try {
       await runAutoBackup(server);
     } catch (err) {
       console.error(`[BackupScheduler] Auto-backup failed for "${server.name}":`, err);
+    } finally {
+      setBackingUp(server.id, false);
     }
   }
 }

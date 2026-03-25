@@ -1,6 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Plus, MemoryStick, Users, Server, AlertTriangle, Search } from 'lucide-react';
+
+function fmtDuration(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d > 0) return `${d}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${m % 60}m`;
+  return `${m}m`;
+}
 import { useServersStore } from '../stores/serversStore';
 import StatusBadge from '../components/StatusBadge';
 
@@ -17,6 +26,12 @@ export default function Dashboard() {
   const [dockerAvailable, setDockerAvailable] = useState(true);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     fetch('/api/health')
@@ -158,7 +173,15 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                <StatusBadge status={sv.runtime.status} />
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <StatusBadge status={sv.runtime.status} />
+                  {sv.runtime.status === 'running' && sv.runtime.startedAt && (
+                    <span className="text-xs text-mc-green">Up {fmtDuration(now - sv.runtime.startedAt)}</span>
+                  )}
+                  {(sv.runtime.status === 'stopped' || sv.runtime.status === 'crashed') && sv.runtime.stoppedAt && (
+                    <span className="text-xs text-mc-muted">{fmtDuration(now - sv.runtime.stoppedAt)} ago</span>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 mt-4">

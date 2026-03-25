@@ -55,6 +55,9 @@ export interface ServerRuntime {
   consoleBuf: string[];
   crashDiagnosis?: CrashIssue[];
   playersOnline: string[];
+  startedAt?: number;
+  stoppedAt?: number;
+  backingUp?: boolean;
 }
 
 export type BackupType = 'full' | 'world';
@@ -79,7 +82,8 @@ export type WsInbound =
 
 export type WsOutbound =
   | { type: 'console_line'; serverId: string; line: string; timestamp: number }
-  | { type: 'status_change'; serverId: string; status: ServerStatus }
+  | { type: 'status_change'; serverId: string; status: ServerStatus; startedAt?: number; stoppedAt?: number }
   | { type: 'metrics_tick'; serverId: string; metrics: ServerMetrics; timestamp: number }
   | { type: 'crash_diagnosis'; serverId: string; issues: CrashIssue[] }
+  | { type: 'backup_status'; serverId: string; backingUp: boolean }
   | { type: 'error'; code: string; message: string };

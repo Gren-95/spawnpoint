@@ -13,6 +13,16 @@ function fmtBytes(b: number): string {
   return `${(b / 1024 ** 3).toFixed(2)} GB`;
 }
 
+function suggestJava(mcVersion: string): string | null {
+  const parts = mcVersion.split('.').map(Number);
+  const minor = parts[1] ?? 0;
+  const patch = parts[2] ?? 0;
+  if (minor >= 21 || (minor === 20 && patch >= 5)) return '21';
+  if (minor >= 17) return '17';
+  if (minor >= 12) return '11';
+  return '8';
+}
+
 const JAVA_VERSIONS = [
   { value: '8',        label: 'Java 8' },
   { value: '11',       label: 'Java 11' },
@@ -87,7 +97,21 @@ export default function SettingsTab({ server }: { server: Server }) {
             <select className="input" value={form.javaVersion} onChange={e => set('javaVersion', e.target.value)}>
               {JAVA_VERSIONS.map(j => <option key={j.value} value={j.value}>{j.label}</option>)}
             </select>
-            <p className="text-xs text-mc-muted mt-1">Requires restart</p>
+            {(() => {
+              const suggested = suggestJava(server.mcVersion);
+              const selectedBase = form.javaVersion.replace('-graal', '');
+              if (suggested && selectedBase !== suggested) {
+                return (
+                  <p className="text-xs text-yellow-400 mt-1">
+                    MC {server.mcVersion} recommends Java {suggested}.{' '}
+                    <button type="button" className="underline hover:text-yellow-300" onClick={() => set('javaVersion', suggested)}>
+                      Switch
+                    </button>
+                  </p>
+                );
+              }
+              return <p className="text-xs text-mc-muted mt-1">Requires restart</p>;
+            })()}
           </div>
         </div>
 

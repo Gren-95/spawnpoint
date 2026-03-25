@@ -22,6 +22,9 @@ export interface ServerRuntime {
   status: ServerStatus;
   metrics: ServerMetrics;
   crashDiagnosis?: CrashIssue[];
+  startedAt?: number;
+  stoppedAt?: number;
+  backingUp?: boolean;
 }
 
 export interface Server {

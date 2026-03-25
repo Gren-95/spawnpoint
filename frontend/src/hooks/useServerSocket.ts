@@ -53,13 +53,19 @@ function registerStoreHandler(): void {
   storeHandlerRegistered = true;
 
   handlers.add((msg) => {
-    const { updateStatus, updateMetrics, updateCrashDiagnosis } = useServersStore.getState();
+    const { updateStatus, updateMetrics, updateCrashDiagnosis, updateRuntime } = useServersStore.getState();
     if (msg.type === 'status_change') {
       updateStatus(msg.serverId as string, msg.status as never);
+      updateRuntime(msg.serverId as string, {
+        startedAt: msg.startedAt as number | undefined,
+        stoppedAt: msg.stoppedAt as number | undefined,
+      });
     } else if (msg.type === 'metrics_tick') {
       updateMetrics(msg.serverId as string, msg.metrics as never);
     } else if (msg.type === 'crash_diagnosis') {
       updateCrashDiagnosis(msg.serverId as string, msg.issues as never);
+    } else if (msg.type === 'backup_status') {
+      updateRuntime(msg.serverId as string, { backingUp: msg.backingUp as boolean });
     }
   });
 }

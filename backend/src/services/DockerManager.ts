@@ -40,8 +40,21 @@ function getRuntime(serverId: string): ServerRuntime {
 }
 
 function setStatus(serverId: string, status: ServerStatus): void {
-  getRuntime(serverId).status = status;
-  broadcast(serverId, { type: 'status_change', serverId, status });
+  const rt = getRuntime(serverId);
+  rt.status = status;
+  if (status === 'running') {
+    rt.startedAt = Date.now();
+    rt.stoppedAt = undefined;
+  } else if (status === 'stopped' || status === 'crashed') {
+    rt.stoppedAt = Date.now();
+    rt.startedAt = undefined;
+  }
+  broadcast(serverId, { type: 'status_change', serverId, status, startedAt: rt.startedAt, stoppedAt: rt.stoppedAt });
+}
+
+export function setBackingUp(serverId: string, value: boolean): void {
+  getRuntime(serverId).backingUp = value;
+  broadcast(serverId, { type: 'backup_status', serverId, backingUp: value });
 }
 
 function pushLine(serverId: string, line: string): void {

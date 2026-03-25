@@ -151,7 +151,8 @@ export default function ServerDetail() {
         )}
 
         {/* Tab nav */}
-        <nav className="flex gap-0.5 mt-4 -mb-4 overflow-x-auto scrollbar-none">
+        <div className="relative mt-4 -mb-4">
+        <nav className="flex gap-0.5 overflow-x-auto scrollbar-none">
           {TABS.map(({ path, label, icon: Icon }) => (
             <NavLink
               key={path}
@@ -175,6 +176,8 @@ export default function ServerDetail() {
             </NavLink>
           ))}
         </nav>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-mc-panel to-transparent" />
+        </div>
       </div>
 
       {/* Crash analysis banner */}

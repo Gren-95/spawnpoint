@@ -6,7 +6,7 @@ import multer from 'multer';
 import { getServer } from '../models/Server';
 import { listBackups, getBackup, createBackup, deleteBackup } from '../models/Backup';
 import { createBackupArchive, createWorldBackupArchive, restoreBackupArchive, detectWorldDirs, detectModpackInfo } from '../services/BackupService';
-import { stopServer, startServer, getServerRuntime } from '../services/DockerManager';
+import { stopServer, startServer, getServerRuntime, sendCommand } from '../services/DockerManager';
 import { SERVERS_DIR, BACKUPS_DIR } from '../config';
 
 const upload = multer({ dest: '/tmp/mc-backups/' });
@@ -40,6 +40,13 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const label = (req.body.label as string) || new Date().toLocaleString();
     const type: 'full' | 'world' = req.body.type === 'world' ? 'world' : 'full';
+    const announceMessage = typeof req.body.announceMessage === 'string' ? req.body.announceMessage.trim() : '';
+
+    const rt = getServerRuntime(server.id);
+    if (announceMessage && rt.status === 'running') {
+      try { await sendCommand(server, `say ${announceMessage}`); } catch { /* best-effort */ }
+    }
+
     const id = nanoid(10);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
     const safeName = server.name.replace(/[^a-zA-Z0-9_-]/g, '_');
