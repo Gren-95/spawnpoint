@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, ShieldOff, LogOut, Ban, RotateCw, UserPlus, Users, Crown } from 'lucide-react';
+import { Shield, ShieldOff, LogOut, Ban, RotateCw, UserPlus, Users, Crown, History } from 'lucide-react';
 import { api } from '../../api/client';
 
 interface OpsEntry { uuid: string; name: string; level: number; }
 interface WhitelistEntry { uuid: string; name: string; }
 interface BannedEntry { uuid: string; name: string; reason: string; expires: string; }
+interface UsercacheEntry { uuid: string; name: string; expiresOn: string; }
 
 interface PlayersData {
   online: string[];
   ops: OpsEntry[];
   whitelist: WhitelistEntry[];
   banned: BannedEntry[];
+  usercache: UsercacheEntry[];
 }
 
 const OP_LEVELS: Record<number, string> = {
@@ -26,7 +28,7 @@ export default function PlayersTab({ serverId, serverStatus }: { serverId: strin
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [addInput, setAddInput] = useState('');
-  const [activeSection, setActiveSection] = useState<'online' | 'ops' | 'whitelist' | 'banned'>('online');
+  const [activeSection, setActiveSection] = useState<'online' | 'ops' | 'whitelist' | 'banned' | 'known'>('online');
 
   const isRunning = serverStatus === 'running';
 
@@ -72,6 +74,7 @@ export default function PlayersTab({ serverId, serverStatus }: { serverId: strin
     { key: 'ops' as const, label: 'Operators', count: data.ops.length, icon: Crown },
     { key: 'whitelist' as const, label: 'Whitelist', count: data.whitelist.length, icon: UserPlus },
     { key: 'banned' as const, label: 'Banned', count: data.banned.length, icon: Ban },
+    { key: 'known' as const, label: 'Known', count: data.usercache.length, icon: History },
   ];
 
   return (
@@ -266,6 +269,73 @@ export default function PlayersTab({ serverId, serverStatus }: { serverId: strin
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Known players (usercache) */}
+      {activeSection === 'known' && (
+        <div className="space-y-2">
+          {data.usercache.length === 0 ? (
+            <div className="card p-6 text-center text-mc-muted text-sm">
+              <History size={28} className="mx-auto mb-2 opacity-40" />
+              No players have joined yet
+            </div>
+          ) : (
+            <div className="card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-mc-muted border-b border-mc-border bg-mc-panel/60">
+                  <tr>
+                    <th className="text-left px-4 py-2">Player</th>
+                    <th className="text-left px-4 py-2 hidden sm:table-cell">UUID</th>
+                    <th className="text-right px-4 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.usercache.map((p) => {
+                    const isOnline = data.online.some((n) => n.toLowerCase() === p.name.toLowerCase());
+                    const isOp = data.ops.some((o) => o.name.toLowerCase() === p.name.toLowerCase());
+                    const isBanned = data.banned.some((b) => b.name.toLowerCase() === p.name.toLowerCase());
+                    return (
+                      <tr key={p.uuid} className="border-b border-mc-border/40 hover:bg-mc-panel/40">
+                        <td className="px-4 py-2 flex items-center gap-2">
+                          <span className="font-mono text-gray-200">{p.name}</span>
+                          {isOnline && <span className="text-xs text-mc-green bg-mc-green/20 px-1.5 py-0.5 rounded">Online</span>}
+                          {isOp && <span className="text-xs text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded">OP</span>}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-mc-muted font-mono hidden sm:table-cell truncate max-w-40">{p.uuid}</td>
+                        <td className="px-4 py-2 text-right">
+                          <div className="flex justify-end gap-1">
+                            {isOp ? (
+                              <ActionButton icon={ShieldOff} label="Deop" danger
+                                disabled={!isRunning || busy === `deop:${p.name}`}
+                                onClick={() => doAction('deop', p.name)} />
+                            ) : (
+                              <ActionButton icon={Shield} label="Op"
+                                disabled={!isRunning || busy === `op:${p.name}`}
+                                onClick={() => doAction('op', p.name)} />
+                            )}
+                            {isBanned ? (
+                              <ActionButton icon={RotateCw} label="Pardon"
+                                disabled={!isRunning || busy === `pardon:${p.name}`}
+                                onClick={() => doAction('pardon', p.name)} />
+                            ) : (
+                              <ActionButton icon={Ban} label="Ban" danger
+                                disabled={!isRunning || busy === `ban:${p.name}`}
+                                onClick={() => {
+                                  const reason = prompt(`Ban reason for ${p.name} (optional):`);
+                                  if (reason === null) return;
+                                  doAction('ban', p.name, reason ? { reason } : {});
+                                }} />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

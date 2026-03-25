@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { Plus, MemoryStick, Users, Server, AlertTriangle, Search } from 'lucide-react';
+import { Plus, MemoryStick, Users, Server, AlertTriangle, Search, Play, Square, RotateCw } from 'lucide-react';
+import { api } from '../api/client';
 
 function fmtDuration(ms: number): string {
   const m = Math.floor(ms / 60000);
@@ -27,11 +28,20 @@ export default function Dashboard() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
+
+  async function bulkAction(action: 'start' | 'stop' | 'restart', targets: typeof servers) {
+    setBulkLoading(action);
+    await Promise.allSettled(targets.map((s) => api.post(`/servers/${s.id}/${action}`)));
+    setBulkLoading(null);
+  }
+
+  const stopped = servers.filter((s) => s.runtime.status === 'stopped' || s.runtime.status === 'crashed');
 
   useEffect(() => {
     fetch('/api/health')
@@ -68,7 +78,7 @@ export default function Dashboard() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-100">Dashboard</h1>
           <p className="text-mc-muted text-sm mt-1">{running} of {servers.length} servers running</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {servers.length > 0 && (
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-mc-muted pointer-events-none" />
@@ -79,6 +89,36 @@ export default function Dashboard() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
+          )}
+          {stopped.length > 0 && (
+            <button
+              className="btn-ghost text-sm"
+              onClick={() => bulkAction('start', stopped)}
+              disabled={!!bulkLoading}
+              title={`Start ${stopped.length} stopped server${stopped.length > 1 ? 's' : ''}`}
+            >
+              <Play size={13} /> Start all
+            </button>
+          )}
+          {running > 0 && (
+            <>
+              <button
+                className="btn-ghost text-sm"
+                onClick={() => bulkAction('restart', servers.filter((s) => s.runtime.status === 'running'))}
+                disabled={!!bulkLoading}
+                title="Restart all running servers"
+              >
+                <RotateCw size={13} /> Restart all
+              </button>
+              <button
+                className="btn-ghost text-sm"
+                onClick={() => bulkAction('stop', servers.filter((s) => s.runtime.status === 'running'))}
+                disabled={!!bulkLoading}
+                title="Stop all running servers"
+              >
+                <Square size={13} /> Stop all
+              </button>
+            </>
           )}
           <button onClick={() => navigate('/servers/new')} className="btn-primary text-sm">
             <Plus size={15} /> Add Server

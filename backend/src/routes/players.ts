@@ -24,6 +24,7 @@ router.get('/', (req: Request, res: Response, next: NextFunction) => {
     const serverDir = path.join(SERVERS_DIR, server.id);
     const rt = getServerRuntime(server.id);
 
+    interface UsercacheEntry { uuid: string; name: string; expiresOn: string; }
     res.json({
       success: true,
       data: {
@@ -31,6 +32,7 @@ router.get('/', (req: Request, res: Response, next: NextFunction) => {
         ops: readJson<OpsEntry>(path.join(serverDir, 'ops.json')),
         whitelist: readJson<WhitelistEntry>(path.join(serverDir, 'whitelist.json')),
         banned: readJson<BannedEntry>(path.join(serverDir, 'banned-players.json')),
+        usercache: readJson<UsercacheEntry>(path.join(serverDir, 'usercache.json')),
       },
     });
   } catch (err) { next(err); }
