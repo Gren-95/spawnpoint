@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Package, Upload, Trash2, Search, Download, ExternalLink, ChevronLeft, ChevronRight, Loader2, Lock } from 'lucide-react';
-import { api, uploadFiles } from '../../api/client';
+import { api, uploadFiles, imgProxy } from '../../api/client';
 
 interface Entry { name: string; path: string; size: number; mtime: string; }
 
@@ -441,7 +441,7 @@ function ModResults({
           return (
             <div key={id} className={`card p-4 flex items-start gap-3 ${isInstalled ? 'border-mc-green/40' : ''}`}>
               {getIcon(hit) ? (
-                <img src={getIcon(hit)} alt="" className="w-10 h-10 rounded flex-shrink-0 object-cover" />
+                <img src={imgProxy(getIcon(hit))} alt="" className="w-10 h-10 rounded flex-shrink-0 object-cover" />
               ) : (
                 <div className="w-10 h-10 rounded bg-mc-dark flex items-center justify-center flex-shrink-0">
                   <Package size={18} className="text-mc-muted" />

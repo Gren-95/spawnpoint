@@ -26,6 +26,7 @@ import messagesRouter from './routes/messages';
 import schedulesRouter from './routes/schedules';
 import modrinthRouter from './routes/modrinth';
 import curseforgeServerRouter, { globalRouter as curseforgeGlobalRouter } from './routes/curseforge';
+import imageProxyRouter from './routes/imageProxy';
 import { CURSEFORGE_API_KEY } from './config';
 
 async function main(): Promise<void> {
@@ -48,6 +49,9 @@ async function main(): Promise<void> {
     }));
   }
   app.use(express.json({ limit: '50mb' }));
+
+  // Image proxy (public — browser loads images without session cookies)
+  app.use('/api/image-proxy', imageProxyRouter);
 
   // Health check (public)
   app.get('/api/health', async (_req, res) => {

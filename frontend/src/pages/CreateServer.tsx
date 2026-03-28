@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Server, Upload, Archive, ChevronLeft, Package, Search, Download, ExternalLink, ChevronRight, Loader2, Lock } from 'lucide-react';
-import { api, uploadPrismExport } from '../api/client';
+import { api, uploadPrismExport, imgProxy } from '../api/client';
 import { useServersStore } from '../stores/serversStore';
 import type { Server as ServerType } from '../stores/serversStore';
 
@@ -625,7 +625,7 @@ function ModrinthPackForm({ onBack, onDone }: { onBack: () => void; onDone: (id:
         {/* Pack summary */}
         <div className="card p-4 flex items-start gap-3 mb-6">
           {selectedPack.icon_url ? (
-            <img src={selectedPack.icon_url} alt="" className="w-12 h-12 rounded flex-shrink-0 object-cover" />
+            <img src={imgProxy(selectedPack.icon_url)} alt="" className="w-12 h-12 rounded flex-shrink-0 object-cover" />
           ) : (
             <div className="w-12 h-12 rounded bg-mc-dark flex items-center justify-center flex-shrink-0">
               <Package size={20} className="text-mc-muted" />
@@ -758,7 +758,7 @@ function ModrinthPackForm({ onBack, onDone }: { onBack: () => void; onDone: (id:
                 className="card p-4 flex items-start gap-3 w-full text-left hover:border-mc-green/50 transition-colors group"
               >
                 {hit.icon_url ? (
-                  <img src={hit.icon_url} alt="" className="w-10 h-10 rounded flex-shrink-0 object-cover" />
+                  <img src={imgProxy(hit.icon_url)} alt="" className="w-10 h-10 rounded flex-shrink-0 object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded bg-mc-dark flex items-center justify-center flex-shrink-0">
                     <Package size={18} className="text-mc-muted" />
@@ -947,7 +947,7 @@ function CurseForgePackForm({ onBack, onDone }: { onBack: () => void; onDone: (i
 
         <div className="card p-4 flex items-start gap-3 mb-6">
           {selectedPack.logo?.url ? (
-            <img src={selectedPack.logo.url} alt="" className="w-12 h-12 rounded flex-shrink-0 object-cover" />
+            <img src={imgProxy(selectedPack.logo.url)} alt="" className="w-12 h-12 rounded flex-shrink-0 object-cover" />
           ) : (
             <div className="w-12 h-12 rounded bg-mc-dark flex items-center justify-center flex-shrink-0">
               <Package size={20} className="text-mc-muted" />
@@ -1064,7 +1064,7 @@ function CurseForgePackForm({ onBack, onDone }: { onBack: () => void; onDone: (i
                 className="card p-4 flex items-start gap-3 w-full text-left hover:border-mc-green/50 transition-colors group"
               >
                 {hit.logo?.url ? (
-                  <img src={hit.logo.url} alt="" className="w-10 h-10 rounded flex-shrink-0 object-cover" />
+                  <img src={imgProxy(hit.logo.url)} alt="" className="w-10 h-10 rounded flex-shrink-0 object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded bg-mc-dark flex items-center justify-center flex-shrink-0">
                     <Package size={18} className="text-mc-muted" />

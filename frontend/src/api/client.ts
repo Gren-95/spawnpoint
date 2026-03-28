@@ -31,6 +31,12 @@ export const api = {
   delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };
 
+/** Route an external mod/pack image URL through the backend cache proxy. */
+export function imgProxy(url: string | undefined | null): string | undefined {
+  if (!url) return undefined;
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
 export async function uploadFiles(path: string, files: FileList | File[], extra?: Record<string, string>): Promise<void> {
   const fd = new FormData();
   for (const f of Array.from(files)) fd.append('files', f);
