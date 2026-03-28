@@ -1,6 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import yauzl from 'yauzl';
+import { nanoid } from 'nanoid';
 import { getServer } from '../models/Server';
 import { SERVERS_DIR } from '../config';
 import {
@@ -37,6 +40,65 @@ globalRouter.get('/modpacks/versions/:projectId', async (req: Request, res: Resp
   try {
     const resp = await cfGet<{ data: unknown[] }>(`/mods/${req.params.projectId}/files?pageSize=50&sortField=2&sortOrder=desc`);
     res.json({ success: true, data: resp.data });
+  } catch (err) { next(err); }
+});
+
+function readCfZipEntry(zipPath: string, entryName: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zf) => {
+      if (err) return reject(err);
+      zf.readEntry();
+      zf.on('entry', (entry) => {
+        if (entry.fileName === entryName) {
+          zf.openReadStream(entry, (e, stream) => {
+            if (e || !stream) return reject(e ?? new Error('No stream'));
+            const chunks: Buffer[] = [];
+            stream.on('data', (c: Buffer) => chunks.push(c));
+            stream.on('end', () => { zf.close(); resolve(Buffer.concat(chunks)); });
+            stream.on('error', reject);
+          });
+        } else {
+          zf.readEntry();
+        }
+      });
+      zf.on('end', () => reject(new Error(`Entry "${entryName}" not found in zip`)));
+      zf.on('error', reject);
+    });
+  });
+}
+
+function suggestMemoryMb(modCount: number): number {
+  if (modCount < 30)  return 2048;
+  if (modCount < 80)  return 3072;
+  if (modCount < 150) return 4096;
+  if (modCount < 250) return 6144;
+  return 8192;
+}
+
+globalRouter.get('/modpacks/:projectId/files/:fileId/estimate-memory', async (req: Request, res: Response, next: NextFunction) => {
+  if (!cfEnabled()) return next(Object.assign(new Error('CurseForge API key not configured'), { status: 503 }));
+  try {
+    const { projectId, fileId } = req.params;
+    const fileResp = await cfGet<{ data: { downloadUrl: string | null } }>(`/mods/${projectId}/files/${fileId}`);
+    const { downloadUrl } = fileResp.data;
+    if (!downloadUrl) {
+      return res.json({ success: true, data: { modCount: 0, suggestedMemoryMb: 4096 } });
+    }
+
+    const tmpPath = path.join(os.tmpdir(), `cf-est-${nanoid(8)}.zip`);
+    try {
+      const resp = await fetch(downloadUrl, { headers: { 'User-Agent': 'Spawnpoint/1.0' } });
+      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+      fs.writeFileSync(tmpPath, Buffer.from(await resp.arrayBuffer()));
+
+      const raw = await readCfZipEntry(tmpPath, 'manifest.json');
+      const manifest = JSON.parse(raw.toString('utf8')) as { files?: unknown[] };
+      const modCount = (manifest.files ?? []).length;
+
+      res.json({ success: true, data: { modCount, suggestedMemoryMb: suggestMemoryMb(modCount) } });
+    } finally {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    }
   } catch (err) { next(err); }
 });
 

@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { nanoid } from 'nanoid';
+import yauzl from 'yauzl';
 import { importPrismExport } from '../services/PrismImporter';
 import { importMrpack } from '../services/MrpackImporter';
 import { importCurseForgeModpack } from '../services/CurseForgeModpackImporter';
@@ -156,6 +157,63 @@ router.get('/modpacks/versions/:projectId', async (req: Request, res: Response, 
     if (!resp.ok) throw new Error(`Modrinth API error: ${resp.status}`);
     const versions = await resp.json();
     res.json({ success: true, data: versions });
+  } catch (err) { next(err); }
+});
+
+// Estimate memory by counting mods in the mrpack manifest
+function readZipEntry(zipPath: string, entryName: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zf) => {
+      if (err) return reject(err);
+      zf.readEntry();
+      zf.on('entry', (entry) => {
+        if (entry.fileName === entryName) {
+          zf.openReadStream(entry, (e, stream) => {
+            if (e || !stream) return reject(e ?? new Error('No stream'));
+            const chunks: Buffer[] = [];
+            stream.on('data', (c: Buffer) => chunks.push(c));
+            stream.on('end', () => { zf.close(); resolve(Buffer.concat(chunks)); });
+            stream.on('error', reject);
+          });
+        } else {
+          zf.readEntry();
+        }
+      });
+      zf.on('end', () => reject(new Error(`Entry "${entryName}" not found in zip`)));
+      zf.on('error', reject);
+    });
+  });
+}
+
+function suggestMemoryMb(modCount: number): number {
+  if (modCount < 30)  return 2048;
+  if (modCount < 80)  return 3072;
+  if (modCount < 150) return 4096;
+  if (modCount < 250) return 6144;
+  return 8192;
+}
+
+router.get('/modpacks/estimate-memory', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const url = (req.query.url as string) ?? '';
+    if (!url.startsWith('https://cdn.modrinth.com/')) {
+      return next(Object.assign(new Error('Only Modrinth CDN URLs accepted'), { status: 400 }));
+    }
+
+    const tmpPath = path.join(os.tmpdir(), `mrpack-est-${nanoid(8)}.mrpack`);
+    try {
+      const resp = await fetch(url, { headers: { 'User-Agent': 'Spawnpoint/1.0 (self-hosted MC manager)' } });
+      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+      fs.writeFileSync(tmpPath, Buffer.from(await resp.arrayBuffer()));
+
+      const raw = await readZipEntry(tmpPath, 'modrinth.index.json');
+      const index = JSON.parse(raw.toString('utf8')) as { files?: { env?: { server?: string } }[] };
+      const modCount = (index.files ?? []).filter(f => f.env?.server !== 'unsupported').length;
+
+      res.json({ success: true, data: { modCount, suggestedMemoryMb: suggestMemoryMb(modCount) } });
+    } finally {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    }
   } catch (err) { next(err); }
 });
 

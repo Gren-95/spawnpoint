@@ -523,12 +523,35 @@ function ModrinthPackForm({ onBack, onDone }: { onBack: () => void; onDone: (id:
   const [name, setName] = useState('');
   const [port, setPort] = useState(25565);
   const [memoryMb, setMemoryMb] = useState(4096);
+  const [memoryHint, setMemoryHint] = useState('');
   const [javaVersion, setJavaVersion] = useState('21');
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState('');
   const [result, setResult] = useState<{ name: string; versionId: string; mcVersion: string; serverType: string; loaderVersion?: string; modsDownloaded: number; modsSkipped: number } | null>(null);
 
   const totalPages = Math.ceil(total / PACK_PAGE_SIZE);
+
+  // Auto-estimate memory when a version is selected
+  useEffect(() => {
+    if (!selectedVersionId || !versions.length) return;
+    const ver = versions.find(v => v.id === selectedVersionId);
+    if (!ver) return;
+    const file = ver.files.find(f => f.primary) ?? ver.files[0];
+    if (!file?.url) return;
+
+    let cancelled = false;
+    setMemoryHint('Estimating…');
+    api.get<{ modCount: number; suggestedMemoryMb: number }>(
+      `/prism/modpacks/estimate-memory?url=${encodeURIComponent(file.url)}`
+    ).then(data => {
+      if (cancelled) return;
+      setMemoryMb(data.suggestedMemoryMb);
+      setMemoryHint(`${data.modCount} mods detected → ${data.suggestedMemoryMb} MB suggested`);
+    }).catch(() => {
+      if (!cancelled) setMemoryHint('');
+    });
+    return () => { cancelled = true; };
+  }, [selectedVersionId]);
 
   async function search(q: string, p: number) {
     setSearching(true);
@@ -651,7 +674,7 @@ function ModrinthPackForm({ onBack, onDone }: { onBack: () => void; onDone: (id:
             <div>
               <label className="label">Memory (MB)</label>
               <input className="input" type="number" min={512} step={512} value={memoryMb} onChange={e => setMemoryMb(parseInt(e.target.value))} />
-              <p className="text-xs text-mc-muted mt-1">4096 MB recommended for modpacks</p>
+              {memoryHint && <p className="text-xs text-mc-muted mt-1">{memoryHint}</p>}
             </div>
             <div>
               <label className="label">Java Version</label>
@@ -822,12 +845,30 @@ function CurseForgePackForm({ onBack, onDone }: { onBack: () => void; onDone: (i
   const [name, setName] = useState('');
   const [port, setPort] = useState(25565);
   const [memoryMb, setMemoryMb] = useState(4096);
+  const [memoryHint, setMemoryHint] = useState('');
   const [javaVersion, setJavaVersion] = useState('21');
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState('');
   const [result, setResult] = useState<{ name: string; version: string; mcVersion: string; serverType: string; loaderVersion?: string; modsDownloaded: number; modsSkipped: number } | null>(null);
 
   const totalPages = Math.ceil(total / CF_PACK_PAGE_SIZE);
+
+  // Auto-estimate memory when a file version is selected
+  useEffect(() => {
+    if (!selectedFileId || !selectedPack) return;
+    let cancelled = false;
+    setMemoryHint('Estimating…');
+    api.get<{ modCount: number; suggestedMemoryMb: number }>(
+      `/curseforge/modpacks/${selectedPack.id}/files/${selectedFileId}/estimate-memory`
+    ).then(data => {
+      if (cancelled) return;
+      setMemoryMb(data.suggestedMemoryMb);
+      setMemoryHint(`${data.modCount} mods detected → ${data.suggestedMemoryMb} MB suggested`);
+    }).catch(() => {
+      if (!cancelled) setMemoryHint('');
+    });
+    return () => { cancelled = true; };
+  }, [selectedFileId]);
 
   async function search(q: string, p: number) {
     setSearching(true);
@@ -951,7 +992,7 @@ function CurseForgePackForm({ onBack, onDone }: { onBack: () => void; onDone: (i
             <div>
               <label className="label">Memory (MB)</label>
               <input className="input" type="number" min={512} step={512} value={memoryMb} onChange={e => setMemoryMb(parseInt(e.target.value))} />
-              <p className="text-xs text-mc-muted mt-1">4096 MB recommended for modpacks</p>
+              {memoryHint && <p className="text-xs text-mc-muted mt-1">{memoryHint}</p>}
             </div>
             <div>
               <label className="label">Java Version</label>
