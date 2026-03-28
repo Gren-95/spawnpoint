@@ -71,7 +71,7 @@ export const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD ?? '';
 // If unset, CORS is disabled (same-origin only — recommended for production).
 export const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '';
 
-export const APP_VERSION = process.env.BUILD_VERSION ?? 'dev';
+export const APP_VERSION = process.env.BUILD_VERSION ?? '';
 
 // CurseForge API keys contain $ characters which Docker Compose interpolates,
 // corrupting the key. Read from a file first to avoid this entirely.
