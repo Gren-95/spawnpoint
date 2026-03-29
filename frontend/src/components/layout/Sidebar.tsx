@@ -67,9 +67,6 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             <img src="/favicon.svg" alt="Spawnpoint" className="w-5 h-5 flex-shrink-0" />
             <span className="font-bold text-mc-green tracking-tight leading-none">Spawnpoint</span>
           </div>
-          {version && (
-            <div className="text-xs font-mono text-mc-muted mt-1 ml-7">{version}</div>
-          )}
         </div>
         {onClose && (
           <button onClick={onClose} className="md:hidden text-mc-muted hover:text-gray-200 -mr-1 flex-shrink-0">
@@ -196,25 +193,30 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           </button>
         )}
 
-        <div className="px-2 pt-1 flex items-center gap-3">
-          <a
-            href="https://github.com/Gren-95/spawnpoint"
-            target="_blank"
-            rel="noreferrer"
-            title="GitHub"
-            className="text-mc-muted hover:text-gray-300 transition-colors duration-150"
-          >
-            <Github size={13} />
-          </a>
-          <a
-            href="https://hub.docker.com/r/fossfrog/spawnpoint"
-            target="_blank"
-            rel="noreferrer"
-            title="Docker Hub"
-            className="text-mc-muted hover:text-gray-300 transition-colors duration-150"
-          >
-            <DockerIcon size={13} />
-          </a>
+        <div className="pt-1 border-t border-mc-border mt-1 flex items-center justify-between px-1">
+          <div className="flex items-center gap-1">
+            <a
+              href="https://github.com/Gren-95/spawnpoint"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-mc-muted hover:text-gray-200 hover:bg-white/5 transition-all duration-150"
+            >
+              <Github size={13} />
+              <span>GitHub</span>
+            </a>
+            <a
+              href="https://hub.docker.com/r/fossfrog/spawnpoint"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-mc-muted hover:text-gray-200 hover:bg-white/5 transition-all duration-150"
+            >
+              <DockerIcon size={13} />
+              <span>Docker</span>
+            </a>
+          </div>
+          {version && (
+            <span className="text-xs font-mono text-mc-muted px-1">{version}</span>
+          )}
         </div>
       </div>
 
