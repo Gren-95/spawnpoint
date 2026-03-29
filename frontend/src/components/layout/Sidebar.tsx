@@ -22,12 +22,17 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [version, setVersion] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
       .then(r => r.json())
       .then(json => setVersion(json.data?.version ?? null))
+      .catch(() => {});
+    fetch('/api/auth/check')
+      .then(r => r.json())
+      .then(json => setAuthRequired(json.data?.required ?? false))
       .catch(() => {});
   }, []);
 
@@ -181,13 +186,15 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <span>Notifications</span>
         </button>
 
-        <button
-          onClick={logout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-mc-muted hover:text-red-400 hover:bg-red-500/5 transition-all duration-150"
-        >
-          <LogOut size={13} className="flex-shrink-0" />
-          <span>Sign out</span>
-        </button>
+        {authRequired && (
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-mc-muted hover:text-red-400 hover:bg-red-500/5 transition-all duration-150"
+          >
+            <LogOut size={13} className="flex-shrink-0" />
+            <span>Sign out</span>
+          </button>
+        )}
 
         <div className="px-2 pt-1 flex items-center gap-3">
           <a
